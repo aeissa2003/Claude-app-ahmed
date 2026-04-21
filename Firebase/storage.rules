@@ -1,0 +1,19 @@
+rules_version = '2';
+
+// Phase 1 starter rules. Phase 8 will harden.
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isSignedIn() { return request.auth != null; }
+    function isSelf(uid)  { return isSignedIn() && request.auth.uid == uid; }
+
+    // User-owned images: profile, recipe covers/gallery, per-recipe ingredient photos.
+    // Readable by any signed-in user (friends need to see shared recipes).
+    match /users/{uid}/{path=**} {
+      allow read:  if isSignedIn();
+      allow write: if isSelf(uid)
+                   && request.resource.size < 10 * 1024 * 1024          // 10 MB cap
+                   && request.resource.contentType.matches('image/.*');
+    }
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "exercises": [
+    { "id": "bench_press_barbell",     "name": "Barbell Bench Press",        "primaryMuscle": "chest",     "secondaryMuscles": ["triceps", "shoulders"], "equipment": "barbell" },
+    { "id": "bench_press_dumbbell",    "name": "Dumbbell Bench Press",       "primaryMuscle": "chest",     "secondaryMuscles": ["triceps", "shoulders"], "equipment": "dumbbell" },
+    { "id": "incline_db_press",        "name": "Incline Dumbbell Press",     "primaryMuscle": "chest",     "secondaryMuscles": ["shoulders", "triceps"], "equipment": "dumbbell" },
+    { "id": "pushup",                  "name": "Push-up",                    "primaryMuscle": "chest",     "secondaryMuscles": ["triceps", "core"],      "equipment": "bodyweight" },
+    { "id": "cable_fly",               "name": "Cable Chest Fly",            "primaryMuscle": "chest",     "secondaryMuscles": ["shoulders"],            "equipment": "cable" },
+
+    { "id": "deadlift_barbell",        "name": "Conventional Deadlift",      "primaryMuscle": "back",      "secondaryMuscles": ["hamstrings", "glutes", "core"], "equipment": "barbell" },
+    { "id": "pull_up",                 "name": "Pull-up",                    "primaryMuscle": "back",      "secondaryMuscles": ["biceps"],               "equipment": "bodyweight" },
+    { "id": "chin_up",                 "name": "Chin-up",                    "primaryMuscle": "back",      "secondaryMuscles": ["biceps"],               "equipment": "bodyweight" },
+    { "id": "barbell_row",             "name": "Barbell Row",                "primaryMuscle": "back",      "secondaryMuscles": ["biceps", "core"],       "equipment": "barbell" },
+    { "id": "lat_pulldown",            "name": "Lat Pulldown",               "primaryMuscle": "back",      "secondaryMuscles": ["biceps"],               "equipment": "cable" },
+    { "id": "seated_cable_row",        "name": "Seated Cable Row",           "primaryMuscle": "back",      "secondaryMuscles": ["biceps"],               "equipment": "cable" },
+
+    { "id": "overhead_press_bb",       "name": "Barbell Overhead Press",     "primaryMuscle": "shoulders", "secondaryMuscles": ["triceps", "core"],      "equipment": "barbell" },
+    { "id": "db_shoulder_press",       "name": "Dumbbell Shoulder Press",    "primaryMuscle": "shoulders", "secondaryMuscles": ["triceps"],              "equipment": "dumbbell" },
+    { "id": "lateral_raise_db",        "name": "Dumbbell Lateral Raise",     "primaryMuscle": "shoulders", "secondaryMuscles": [],                       "equipment": "dumbbell" },
+    { "id": "face_pull",               "name": "Face Pull",                  "primaryMuscle": "shoulders", "secondaryMuscles": ["back"],                 "equipment": "cable" },
+
+    { "id": "barbell_curl",            "name": "Barbell Curl",               "primaryMuscle": "biceps",    "secondaryMuscles": ["forearms"],             "equipment": "barbell" },
+    { "id": "db_curl",                 "name": "Dumbbell Curl",              "primaryMuscle": "biceps",    "secondaryMuscles": ["forearms"],             "equipment": "dumbbell" },
+    { "id": "tricep_pushdown",         "name": "Tricep Pushdown",            "primaryMuscle": "triceps",   "secondaryMuscles": [],                       "equipment": "cable" },
+    { "id": "close_grip_bench",        "name": "Close Grip Bench Press",     "primaryMuscle": "triceps",   "secondaryMuscles": ["chest"],                "equipment": "barbell" },
+    { "id": "skull_crushers",          "name": "Skull Crushers",             "primaryMuscle": "triceps",   "secondaryMuscles": [],                       "equipment": "barbell" },
+
+    { "id": "back_squat_bb",           "name": "Barbell Back Squat",         "primaryMuscle": "quads",     "secondaryMuscles": ["glutes", "hamstrings", "core"], "equipment": "barbell" },
+    { "id": "front_squat_bb",          "name": "Barbell Front Squat",        "primaryMuscle": "quads",     "secondaryMuscles": ["core", "glutes"],       "equipment": "barbell" },
+    { "id": "rdl_bb",                  "name": "Romanian Deadlift",          "primaryMuscle": "hamstrings","secondaryMuscles": ["glutes", "back"],       "equipment": "barbell" },
+    { "id": "leg_press",               "name": "Leg Press",                  "primaryMuscle": "quads",     "secondaryMuscles": ["glutes"],               "equipment": "machine" },
+    { "id": "leg_curl",                "name": "Leg Curl",                   "primaryMuscle": "hamstrings","secondaryMuscles": [],                       "equipment": "machine" },
+    { "id": "leg_extension",           "name": "Leg Extension",              "primaryMuscle": "quads",     "secondaryMuscles": [],                       "equipment": "machine" },
+    { "id": "walking_lunge_db",        "name": "Dumbbell Walking Lunge",     "primaryMuscle": "quads",     "secondaryMuscles": ["glutes", "hamstrings"], "equipment": "dumbbell" },
+    { "id": "calf_raise",              "name": "Calf Raise",                 "primaryMuscle": "calves",    "secondaryMuscles": [],                       "equipment": "machine" },
+
+    { "id": "plank",                   "name": "Plank",                      "primaryMuscle": "core",      "secondaryMuscles": [],                       "equipment": "bodyweight" },
+    { "id": "hanging_leg_raise",       "name": "Hanging Leg Raise",          "primaryMuscle": "core",      "secondaryMuscles": [],                       "equipment": "bodyweight" },
+    { "id": "cable_crunch",            "name": "Cable Crunch",               "primaryMuscle": "core",      "secondaryMuscles": [],                       "equipment": "cable" }
+  ]
+}
