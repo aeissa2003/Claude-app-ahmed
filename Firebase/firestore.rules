@@ -1,0 +1,81 @@
+rules_version = '2';
+
+// Phase 1 starter rules. Phase 8 will harden + audit these.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn()        { return request.auth != null; }
+    function isSelf(uid)         { return isSignedIn() && request.auth.uid == uid; }
+    function isFriendOf(otherUid) {
+      return isSignedIn() && exists(/databases/$(database)/documents/users/$(otherUid)/friends/$(request.auth.uid))
+             && get(/databases/$(database)/documents/users/$(otherUid)/friends/$(request.auth.uid)).data.status == 'accepted';
+    }
+
+    // Global seeded catalogs — read-only from client, writes only via admin tooling.
+    match /ingredients/{id} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+    match /exercises/{id} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
+    // User profile root doc: owner has full access, friends can read the profile summary.
+    match /users/{uid} {
+      allow read: if isSelf(uid) || isFriendOf(uid);
+      allow create, update: if isSelf(uid);
+      allow delete: if false;   // account deletion handled via backend in Phase 8
+
+      // Private sub-collections owned by the user.
+      match /recipes/{recipeId} {
+        allow read:  if isSelf(uid)
+                     || (isFriendOf(uid) && resource.data.privacy == 'shared');
+        allow write: if isSelf(uid);
+      }
+
+      match /mealLogs/{logId}   { allow read, write: if isSelf(uid); }
+      match /workouts/{wId}     { allow read, write: if isSelf(uid); }
+      match /workoutTemplates/{tId} { allow read, write: if isSelf(uid); }
+      match /customIngredients/{id} { allow read, write: if isSelf(uid); }
+      match /customExercises/{id}   { allow read, write: if isSelf(uid); }
+
+      // Friendships and requests — users write their own side; the "other" side is
+      // maintained via server-side Cloud Function in Phase 6.
+      match /friends/{friendUid} {
+        allow read: if isSelf(uid);
+        allow write: if isSelf(uid);
+      }
+      match /friendRequests/{fromUid} {
+        allow read: if isSelf(uid);
+        allow create: if isSignedIn() && request.auth.uid == fromUid;
+        allow delete: if isSelf(uid) || (isSignedIn() && request.auth.uid == fromUid);
+      }
+    }
+
+    // Feed posts — author writes, friends read. Likes/comments writable by any friend.
+    match /feedPosts/{postId} {
+      allow read: if isSignedIn() && (request.auth.uid == resource.data.authorUid
+                                     || isFriendOf(resource.data.authorUid));
+      allow create: if isSignedIn() && request.auth.uid == request.resource.data.authorUid;
+      allow update: if isSignedIn() && request.auth.uid == resource.data.authorUid;
+      allow delete: if isSignedIn() && request.auth.uid == resource.data.authorUid;
+
+      match /likes/{likerUid} {
+        allow read: if isSignedIn();
+        allow write: if isSignedIn() && request.auth.uid == likerUid
+                     && (request.auth.uid == get(/databases/$(database)/documents/feedPosts/$(postId)).data.authorUid
+                         || isFriendOf(get(/databases/$(database)/documents/feedPosts/$(postId)).data.authorUid));
+      }
+
+      match /comments/{commentId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn()
+                     && request.auth.uid == request.resource.data.authorUid
+                     && (request.auth.uid == get(/databases/$(database)/documents/feedPosts/$(postId)).data.authorUid
+                         || isFriendOf(get(/databases/$(database)/documents/feedPosts/$(postId)).data.authorUid));
+        allow update, delete: if isSignedIn() && request.auth.uid == resource.data.authorUid;
+      }
+    }
+  }
+}

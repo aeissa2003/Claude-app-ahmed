@@ -1,0 +1,79 @@
+name: ProteinChef
+options:
+  bundleIdPrefix: com.example
+  deploymentTarget:
+    iOS: "17.0"
+  developmentLanguage: en
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+    ENABLE_USER_SCRIPT_SANDBOXING: "YES"
+    GENERATE_INFOPLIST_FILE: "NO"
+    DEVELOPMENT_TEAM: ""
+
+packages:
+  Firebase:
+    url: https://github.com/firebase/firebase-ios-sdk
+    from: "10.29.0"
+  GoogleSignIn:
+    url: https://github.com/google/GoogleSignIn-iOS
+    from: "7.1.0"
+
+targets:
+  ProteinChef:
+    type: application
+    platform: iOS
+    sources:
+      - path: ProteinChef
+        excludes:
+          - "**/*.md"
+      - path: Seed
+        buildPhase: resources
+    dependencies:
+      - package: Firebase
+        product: FirebaseAuth
+      - package: Firebase
+        product: FirebaseFirestore
+      - package: Firebase
+        product: FirebaseFirestoreSwift
+      - package: Firebase
+        product: FirebaseStorage
+      - package: Firebase
+        product: FirebaseMessaging
+      - package: GoogleSignIn
+        product: GoogleSignIn
+      - package: GoogleSignIn
+        product: GoogleSignInSwift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.proteinchef
+        TARGETED_DEVICE_FAMILY: "1,2"
+        INFOPLIST_FILE: ProteinChef/App/Info.plist
+        CODE_SIGN_ENTITLEMENTS: ProteinChef/App/ProteinChef.entitlements
+        CURRENT_PROJECT_VERSION: "1"
+        MARKETING_VERSION: "0.1.0"
+
+  ProteinChefTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - ProteinChefTests
+    dependencies:
+      - target: ProteinChef
+
+schemes:
+  ProteinChef:
+    build:
+      targets:
+        ProteinChef: all
+        ProteinChefTests: [test]
+    test:
+      targets:
+        - ProteinChefTests
+    run:
+      config: Debug
+    archive:
+      config: Release
