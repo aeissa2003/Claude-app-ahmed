@@ -21,6 +21,17 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Handle reservations — one-doc-per-handle, stores owner uid.
+    // Any signed-in user can check availability (read). Only the owner can
+    // create/update their own reservation. Transactional reservation in client.
+    match /handles/{handle} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.uid == request.auth.uid;
+      allow update: if isSignedIn() && resource.data.uid == request.auth.uid
+                    && request.resource.data.uid == request.auth.uid;
+      allow delete: if isSignedIn() && resource.data.uid == request.auth.uid;
+    }
+
     // User profile root doc: owner has full access, friends can read the profile summary.
     match /users/{uid} {
       allow read: if isSelf(uid) || isFriendOf(uid);

@@ -1,5 +1,6 @@
 import SwiftUI
 import FirebaseCore
+import GoogleSignIn
 
 @main
 struct ProteinChefApp: App {
@@ -10,6 +11,9 @@ struct ProteinChefApp: App {
         WindowGroup {
             RootView()
                 .environment(environment)
+                .onOpenURL { url in
+                    GIDSignIn.sharedInstance.handle(url)
+                }
         }
     }
 }

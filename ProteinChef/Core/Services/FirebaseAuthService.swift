@@ -1,20 +1,22 @@
 import Foundation
 import FirebaseAuth
 
-/// Phase 1 stub: wires Firebase's auth state listener so the app can route between signed-in
-/// and signed-out. Real Apple / Google / email flows land in Phase 2.
 final class FirebaseAuthService: AuthServiceProtocol, @unchecked Sendable {
     var currentUid: String? { Auth.auth().currentUser?.uid }
+    var currentEmail: String? { Auth.auth().currentUser?.email }
+    var currentDisplayName: String? { Auth.auth().currentUser?.displayName }
+    var currentPhotoURL: URL? { Auth.auth().currentUser?.photoURL }
+
+    // Held for the duration of an Apple sign-in attempt.
+    private var appleCoordinator: AppleSignInCoordinator?
 
     func authStateStream() -> AsyncStream<AuthState> {
         AsyncStream { continuation in
             let handle = Auth.auth().addStateDidChangeListener { _, user in
-                if user == nil {
+                if let uid = user?.uid {
+                    continuation.yield(.signedIn(uid: uid))
+                } else {
                     continuation.yield(.signedOut)
-                } else if let uid = user?.uid {
-                    // Phase 2 will look up the user's profile and yield .needsOnboarding vs .signedIn
-                    // based on whether onboardingCompletedAt is set. For now, route to onboarding.
-                    continuation.yield(.needsOnboarding(uid: uid))
                 }
             }
             continuation.onTermination = { _ in
@@ -23,12 +25,100 @@ final class FirebaseAuthService: AuthServiceProtocol, @unchecked Sendable {
         }
     }
 
-    func signInWithApple() async throws { throw AuthError.notImplemented }
-    func signInWithGoogle() async throws { throw AuthError.notImplemented }
-    func signUpWithEmail(email: String, password: String, displayName: String) async throws {
-        throw AuthError.notImplemented
+    func signInWithApple() async throws -> AuthOutcome {
+        let coord = AppleSignInCoordinator()
+        appleCoordinator = coord
+        defer { appleCoordinator = nil }
+
+        let result = try await coord.start()
+        let user = result.firebaseUser
+        let formatter = PersonNameComponentsFormatter()
+        let appleName = result.fullName.map { formatter.string(from: $0) }?.nilIfEmpty
+        return AuthOutcome(
+            uid: user.uid,
+            email: user.email,
+            displayName: user.displayName,
+            photoURL: user.photoURL,
+            suggestedDisplayName: appleName ?? user.displayName
+        )
     }
-    func signInWithEmail(email: String, password: String) async throws { throw AuthError.notImplemented }
-    func sendPasswordReset(email: String) async throws { throw AuthError.notImplemented }
-    func signOut() throws { try Auth.auth().signOut() }
+
+    func signInWithGoogle() async throws -> AuthOutcome {
+        let user = try await GoogleSignInHelper.signIn()
+        return AuthOutcome(
+            uid: user.uid,
+            email: user.email,
+            displayName: user.displayName,
+            photoURL: user.photoURL,
+            suggestedDisplayName: user.displayName
+        )
+    }
+
+    func signInWithEmail(email: String, password: String) async throws -> AuthOutcome {
+        do {
+            let result = try await Auth.auth().signIn(withEmail: email, password: password)
+            return Self.outcome(from: result.user)
+        } catch let error as NSError {
+            throw Self.mapAuthError(error)
+        }
+    }
+
+    func signUpWithEmail(email: String, password: String, displayName: String) async throws -> AuthOutcome {
+        do {
+            let result = try await Auth.auth().createUser(withEmail: email, password: password)
+            let change = result.user.createProfileChangeRequest()
+            change.displayName = displayName
+            try await change.commitChanges()
+            try await result.user.reload()
+            return AuthOutcome(
+                uid: result.user.uid,
+                email: result.user.email,
+                displayName: displayName,
+                photoURL: result.user.photoURL,
+                suggestedDisplayName: displayName
+            )
+        } catch let error as NSError {
+            throw Self.mapAuthError(error)
+        }
+    }
+
+    func sendPasswordReset(email: String) async throws {
+        try await Auth.auth().sendPasswordReset(withEmail: email)
+    }
+
+    func signOut() throws {
+        try Auth.auth().signOut()
+    }
+
+    // MARK: -
+
+    private static func outcome(from user: User) -> AuthOutcome {
+        AuthOutcome(
+            uid: user.uid,
+            email: user.email,
+            displayName: user.displayName,
+            photoURL: user.photoURL,
+            suggestedDisplayName: user.displayName
+        )
+    }
+
+    private static func mapAuthError(_ err: NSError) -> AuthError {
+        guard err.domain == AuthErrorDomain,
+              let code = AuthErrorCode(rawValue: err.code) else {
+            return .unknown(err.localizedDescription)
+        }
+        return switch code {
+        case .userNotFound:      .userNotFound
+        case .invalidCredential,
+             .wrongPassword,
+             .invalidEmail:      .invalidCredentials
+        case .weakPassword:      .weakPassword
+        case .emailAlreadyInUse: .emailInUse
+        default:                 .unknown(err.localizedDescription)
+        }
+    }
+}
+
+private extension String {
+    var nilIfEmpty: String? { isEmpty ? nil : self }
 }

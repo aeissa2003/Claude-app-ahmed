@@ -2,7 +2,7 @@
 
 A high-protein-focused iOS app for tracking the recipes you cook and the workouts you train.
 
-> **Status:** Phase 1 scaffold. Working on branch `claude/protein-recipe-workout-app-AcpUP`.
+> **Status:** Phase 2 complete — auth (Apple / Google / Email) + 6-step onboarding. Working on branch `claude/protein-recipe-workout-app-AcpUP`.
 
 ## What it does
 
