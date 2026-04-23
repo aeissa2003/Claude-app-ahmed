@@ -1,14 +1,15 @@
 rules_version = '2';
 
-// Phase 1 starter rules. Phase 8 will harden + audit these.
+// Phase 8 hardened rules. Before launch, replace the dev-permissive rules in the
+// Firebase console with these by running:  firebase deploy --only firestore:rules
 service cloud.firestore {
   match /databases/{database}/documents {
 
     function isSignedIn()        { return request.auth != null; }
     function isSelf(uid)         { return isSignedIn() && request.auth.uid == uid; }
     function isFriendOf(otherUid) {
-      return isSignedIn() && exists(/databases/$(database)/documents/users/$(otherUid)/friends/$(request.auth.uid))
-             && get(/databases/$(database)/documents/users/$(otherUid)/friends/$(request.auth.uid)).data.status == 'accepted';
+      return isSignedIn()
+             && exists(/databases/$(database)/documents/users/$(otherUid)/friends/$(request.auth.uid));
     }
 
     // Global seeded catalogs — read-only from client, writes only via admin tooling.
@@ -23,7 +24,7 @@ service cloud.firestore {
 
     // Handle reservations — one-doc-per-handle, stores owner uid.
     // Any signed-in user can check availability (read). Only the owner can
-    // create/update their own reservation. Transactional reservation in client.
+    // create/update/delete their own reservation. Transactional reservation in client.
     match /handles/{handle} {
       allow read: if isSignedIn();
       allow create: if isSignedIn() && request.resource.data.uid == request.auth.uid;
@@ -36,29 +37,35 @@ service cloud.firestore {
     match /users/{uid} {
       allow read: if isSelf(uid) || isFriendOf(uid);
       allow create, update: if isSelf(uid);
-      allow delete: if false;   // account deletion handled via backend in Phase 8
+      // Self-delete is allowed so AccountDeletionService can wipe the root doc.
+      allow delete: if isSelf(uid);
 
-      // Private sub-collections owned by the user.
+      // Recipes: owner full access; friends can read posts flagged "shared".
       match /recipes/{recipeId} {
         allow read:  if isSelf(uid)
                      || (isFriendOf(uid) && resource.data.privacy == 'shared');
         allow write: if isSelf(uid);
       }
 
-      match /mealLogs/{logId}   { allow read, write: if isSelf(uid); }
-      match /workouts/{wId}     { allow read, write: if isSelf(uid); }
-      match /workoutTemplates/{tId} { allow read, write: if isSelf(uid); }
-      match /customIngredients/{id} { allow read, write: if isSelf(uid); }
-      match /customExercises/{id}   { allow read, write: if isSelf(uid); }
+      match /mealLogs/{logId}         { allow read, write: if isSelf(uid); }
+      match /workouts/{wId}           { allow read, write: if isSelf(uid); }
+      match /workoutTemplates/{tId}   { allow read, write: if isSelf(uid); }
+      match /customIngredients/{id}   { allow read, write: if isSelf(uid); }
+      match /customExercises/{id}     { allow read, write: if isSelf(uid); }
+
+      // Notifications: clients read + mark-read + delete their own.
+      // Cloud Functions (admin SDK) bypass rules and do the writes.
+      match /notifications/{notifId} {
+        allow read, update, delete: if isSelf(uid);
+        allow create: if false;
+      }
 
       // Friendships and requests — clients maintain both sides in atomic batches.
-      // Phase 8 may move sensitive mutations to Cloud Functions.
       match /friends/{friendUid} {
         allow read: if isSelf(uid);
         allow write: if isSelf(uid);
-        // Reciprocal create when the other party accepts my request: they write
-        // into my users/{uid}/friends/{me-as-friend} doc. Gated by the existence of
-        // their own incoming friend request from me — i.e. I did send one.
+        // Reciprocal create during accept: the other party writes into my
+        // collection. Gated by the existence of my incoming request from them.
         allow create: if isSignedIn()
                       && request.auth.uid == friendUid
                       && exists(/databases/$(database)/documents/users/$(request.auth.uid)/friendRequests/$(uid));
@@ -78,12 +85,20 @@ service cloud.firestore {
       }
     }
 
-    // Feed posts — author writes, friends read. Likes/comments writable by any friend.
+    // Feed posts — author writes, friends read. Friends can only touch the
+    // counters via like/comment transactions; they can't edit content.
     match /feedPosts/{postId} {
-      allow read: if isSignedIn() && (request.auth.uid == resource.data.authorUid
-                                     || isFriendOf(resource.data.authorUid));
-      allow create: if isSignedIn() && request.auth.uid == request.resource.data.authorUid;
-      allow update: if isSignedIn() && request.auth.uid == resource.data.authorUid;
+      allow read:   if isSignedIn()
+                    && (request.auth.uid == resource.data.authorUid
+                        || isFriendOf(resource.data.authorUid));
+      allow create: if isSignedIn()
+                    && request.auth.uid == request.resource.data.authorUid;
+      allow update: if isSignedIn() && (
+                      request.auth.uid == resource.data.authorUid
+                      || (isFriendOf(resource.data.authorUid)
+                          && request.resource.data.diff(resource.data).affectedKeys()
+                              .hasOnly(['likeCount', 'commentCount']))
+                    );
       allow delete: if isSignedIn() && request.auth.uid == resource.data.authorUid;
 
       match /likes/{likerUid} {
