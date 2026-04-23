@@ -66,7 +66,7 @@ struct PCTabBar: View {
     var body: some View {
         HStack(spacing: 0) {
             tab(.today,   label: "Today",   systemName: "house")
-            tab(.recipes, label: "Recipes", systemName: "fork.knife")
+            tab(.recipes, label: "Recipes", systemName: "fork.knife", activeSystemName: "fork.knife")
             tab(.train,   label: "Train",   systemName: "dumbbell")
             tab(.feed,    label: "Feed",    systemName: "person.2", badge: unreadFeed)
             tab(.me,      label: "Me",      systemName: "sun.max")
@@ -88,6 +88,7 @@ struct PCTabBar: View {
     private func tab(_ value: MainTabView.Tab,
                      label: String,
                      systemName: String,
+                     activeSystemName: String? = nil,
                      badge: Int = 0) -> some View {
         Button {
             withAnimation(.easeOut(duration: 0.2)) { selection = value }
@@ -95,7 +96,7 @@ struct PCTabBar: View {
             let active = selection == value
             VStack(spacing: 4) {
                 ZStack(alignment: .topTrailing) {
-                    Image(systemName: active ? "\(systemName).fill" : systemName)
+                    Image(systemName: active ? (activeSystemName ?? "\(systemName).fill") : systemName)
                         .font(.system(size: 20, weight: .regular))
                         .foregroundStyle(active ? Theme.Colors.ink : Theme.Colors.ink3)
                         .frame(width: 28, height: 24)
