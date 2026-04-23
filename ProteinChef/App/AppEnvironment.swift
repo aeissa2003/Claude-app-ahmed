@@ -17,6 +17,8 @@ final class AppEnvironment {
     let customExercises: CustomExerciseRepositoryProtocol
     let friends: FriendRepositoryProtocol
     let feed: FeedRepositoryProtocol
+    let notifications: NotificationRepositoryProtocol
+    let accountDeletion: AccountDeletionServiceProtocol
 
     let ingredientCatalog: IngredientCatalogProtocol
     let exerciseCatalog: ExerciseCatalogProtocol
@@ -35,6 +37,8 @@ final class AppEnvironment {
         customExercises: CustomExerciseRepositoryProtocol,
         friends: FriendRepositoryProtocol,
         feed: FeedRepositoryProtocol,
+        notifications: NotificationRepositoryProtocol,
+        accountDeletion: AccountDeletionServiceProtocol,
         ingredientCatalog: IngredientCatalogProtocol,
         exerciseCatalog: ExerciseCatalogProtocol
     ) {
@@ -51,13 +55,16 @@ final class AppEnvironment {
         self.customExercises = customExercises
         self.friends = friends
         self.feed = feed
+        self.notifications = notifications
+        self.accountDeletion = accountDeletion
         self.ingredientCatalog = ingredientCatalog
         self.exerciseCatalog = exerciseCatalog
     }
 
     static func live() -> AppEnvironment {
-        AppEnvironment(
-            auth: FirebaseAuthService(),
+        let auth = FirebaseAuthService()
+        return AppEnvironment(
+            auth: auth,
             firestore: FirebaseFirestoreService(),
             storage: FirebaseStorageService(),
             push: FirebasePushService(),
@@ -70,6 +77,8 @@ final class AppEnvironment {
             customExercises: FirebaseCustomExerciseRepository(),
             friends: FirebaseFriendRepository(),
             feed: FirebaseFeedRepository(),
+            notifications: FirebaseNotificationRepository(),
+            accountDeletion: AccountDeletionService(auth: auth),
             ingredientCatalog: BundledIngredientCatalog(),
             exerciseCatalog: BundledExerciseCatalog()
         )
