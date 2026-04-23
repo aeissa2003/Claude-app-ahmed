@@ -22,9 +22,11 @@ struct WelcomeStep: View {
                 .listRowBackground(Color.clear)
             }
 
-            Section("Your name") {
+            Section {
                 TextField("e.g. Ahmed", text: $viewModel.displayName)
                     .textContentType(.name)
+            } header: {
+                Text("Your name")
             } footer: {
                 Text("This is what friends see on your recipes and comments. You can change it later.")
             }

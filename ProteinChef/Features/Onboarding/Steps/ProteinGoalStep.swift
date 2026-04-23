@@ -27,12 +27,14 @@ struct ProteinGoalStep: View {
                 Text("Suggested: \(Int(viewModel.computedProteinGoal)) g based on \(Int(viewModel.weightKg)) kg bodyweight and your goal. Slide to adjust.")
             }
 
-            Section("Calories (starter target)") {
+            Section {
                 HStack {
                     Text("Daily calories")
                     Spacer()
                     Text("\(Int(viewModel.computedCalorieGoal)) kcal").foregroundStyle(.secondary)
                 }
+            } header: {
+                Text("Calories (starter target)")
             } footer: {
                 Text("A rough starting point from Mifflin–St Jeor + activity estimate. You can adjust this in Settings once we have a few days of logs.")
             }

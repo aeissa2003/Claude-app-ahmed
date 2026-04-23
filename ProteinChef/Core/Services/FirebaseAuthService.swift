@@ -90,6 +90,20 @@ final class FirebaseAuthService: AuthServiceProtocol, @unchecked Sendable {
         try Auth.auth().signOut()
     }
 
+    func deleteCurrentUser() async throws {
+        guard let user = Auth.auth().currentUser else { return }
+        do {
+            try await user.delete()
+        } catch let err as NSError {
+            if err.domain == AuthErrorDomain,
+               let code = AuthErrorCode.Code(rawValue: err.code),
+               code == .requiresRecentLogin {
+                throw AuthError.requiresRecentLogin
+            }
+            throw AuthError.unknown(err.localizedDescription)
+        }
+    }
+
     // MARK: -
 
     private static func outcome(from user: User) -> AuthOutcome {
@@ -104,7 +118,7 @@ final class FirebaseAuthService: AuthServiceProtocol, @unchecked Sendable {
 
     private static func mapAuthError(_ err: NSError) -> AuthError {
         guard err.domain == AuthErrorDomain,
-              let code = AuthErrorCode(rawValue: err.code) else {
+              let code = AuthErrorCode.Code(rawValue: err.code) else {
             return .unknown(err.localizedDescription)
         }
         return switch code {

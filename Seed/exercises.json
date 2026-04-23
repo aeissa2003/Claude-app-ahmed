@@ -34,8 +34,18 @@
     { "id": "walking_lunge_db",        "name": "Dumbbell Walking Lunge",     "primaryMuscle": "quads",     "secondaryMuscles": ["glutes", "hamstrings"], "equipment": "dumbbell" },
     { "id": "calf_raise",              "name": "Calf Raise",                 "primaryMuscle": "calves",    "secondaryMuscles": [],                       "equipment": "machine" },
 
-    { "id": "plank",                   "name": "Plank",                      "primaryMuscle": "core",      "secondaryMuscles": [],                       "equipment": "bodyweight" },
-    { "id": "hanging_leg_raise",       "name": "Hanging Leg Raise",          "primaryMuscle": "core",      "secondaryMuscles": [],                       "equipment": "bodyweight" },
-    { "id": "cable_crunch",            "name": "Cable Crunch",               "primaryMuscle": "core",      "secondaryMuscles": [],                       "equipment": "cable" }
+    { "id": "plank",                   "name": "Plank",                      "primaryMuscle": "core",      "secondaryMuscles": [],                       "equipment": "bodyweight", "kind": "bodyweight" },
+    { "id": "hanging_leg_raise",       "name": "Hanging Leg Raise",          "primaryMuscle": "core",      "secondaryMuscles": [],                       "equipment": "bodyweight", "kind": "bodyweight" },
+    { "id": "cable_crunch",            "name": "Cable Crunch",               "primaryMuscle": "core",      "secondaryMuscles": [],                       "equipment": "cable" },
+
+    { "id": "run_treadmill",           "name": "Treadmill Run",              "primaryMuscle": "cardio",    "secondaryMuscles": [],                       "equipment": "treadmill", "kind": "cardio" },
+    { "id": "run_outdoor",             "name": "Outdoor Run",                "primaryMuscle": "cardio",    "secondaryMuscles": [],                       "equipment": "other",     "kind": "cardio" },
+    { "id": "walk",                    "name": "Walk",                       "primaryMuscle": "cardio",    "secondaryMuscles": [],                       "equipment": "other",     "kind": "cardio" },
+    { "id": "cycle_stationary",        "name": "Stationary Bike",            "primaryMuscle": "cardio",    "secondaryMuscles": [],                       "equipment": "bike",      "kind": "cardio" },
+    { "id": "cycle_outdoor",           "name": "Cycling",                    "primaryMuscle": "cardio",    "secondaryMuscles": [],                       "equipment": "bike",      "kind": "cardio" },
+    { "id": "row_erg",                 "name": "Rowing Machine",             "primaryMuscle": "cardio",    "secondaryMuscles": ["back", "core"],         "equipment": "rower",     "kind": "cardio" },
+    { "id": "elliptical",              "name": "Elliptical",                 "primaryMuscle": "cardio",    "secondaryMuscles": [],                       "equipment": "machine",   "kind": "cardio" },
+    { "id": "stair_climber",           "name": "Stair Climber",              "primaryMuscle": "cardio",    "secondaryMuscles": ["glutes"],               "equipment": "machine",   "kind": "cardio" },
+    { "id": "jump_rope",               "name": "Jump Rope",                  "primaryMuscle": "cardio",    "secondaryMuscles": ["calves"],               "equipment": "other",     "kind": "cardio" }
   ]
 }

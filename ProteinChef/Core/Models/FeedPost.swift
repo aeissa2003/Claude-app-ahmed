@@ -1,32 +1,22 @@
 import Foundation
 
-/// A snapshot of a recipe as it existed when posted — so edits to the source recipe
-/// don't retroactively change what friends saw in their feed.
-struct RecipeSnapshot: Codable, Hashable, Sendable {
-    var recipeId: String
-    var title: String
-    var coverPhotoURL: URL?
-    var macrosPerServing: Macros
-    var servings: Double
-    var prepMinutes: Int
-    var cookMinutes: Int
-    var isHighProtein: Bool
-}
-
-struct FeedPost: Codable, Identifiable, Sendable {
+/// A post on the friends feed. Embeds the full Recipe so friends can save a copy
+/// without a second read, and the recipe displayed in the feed stays fixed even
+/// if the author later edits the source.
+struct FeedPost: Codable, Identifiable, Hashable, Sendable {
     var id: String
     var authorUid: String
     var authorHandle: String
     var authorDisplayName: String
     var authorPhotoURL: URL?
-    var recipeSnapshot: RecipeSnapshot
+    var recipe: Recipe              // snapshot at time of sharing
     var caption: String?
     var likeCount: Int
     var commentCount: Int
     var createdAt: Date
 }
 
-struct FeedComment: Codable, Identifiable, Sendable {
+struct FeedComment: Codable, Identifiable, Hashable, Sendable {
     var id: String
     var authorUid: String
     var authorHandle: String
@@ -36,7 +26,7 @@ struct FeedComment: Codable, Identifiable, Sendable {
     var createdAt: Date
 }
 
-struct FeedLike: Codable, Identifiable, Sendable {
+struct FeedLike: Codable, Identifiable, Hashable, Sendable {
     var id: String                  // liker uid
     var createdAt: Date
 }

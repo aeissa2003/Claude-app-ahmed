@@ -1,14 +1,23 @@
 import UIKit
 import FirebaseCore
+import FirebaseAuth
 import FirebaseMessaging
 import UserNotifications
+
+/// Bridge between UIKit push callbacks and the push service in AppEnvironment.
+/// Since AppEnvironment is a SwiftUI @State value, the delegate can't reach into it
+/// directly. Instead we publish the latest FCM token to a static callback that the
+/// app wires up once the environment is constructed.
+enum PushBridge {
+    static var onToken: (@Sendable (_ token: String?) -> Void)?
+}
 
 final class AppDelegate: NSObject, UIApplicationDelegate {
     func application(
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
-        FirebaseApp.configure()
+        // FirebaseApp.configure() is called earlier from ProteinChefApp.init().
         UNUserNotificationCenter.current().delegate = self
         Messaging.messaging().delegate = self
         return true
@@ -33,9 +42,9 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
 
 extension AppDelegate: MessagingDelegate {
     func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
-        // Phase 7 will persist this token on the user's profile.
         #if DEBUG
         print("FCM token: \(fcmToken ?? "nil")")
         #endif
+        PushBridge.onToken?(fcmToken)
     }
 }

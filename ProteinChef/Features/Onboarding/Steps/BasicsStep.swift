@@ -21,7 +21,7 @@ struct BasicsStep: View {
                 }
             }
 
-            Section("Measurements") {
+            Section {
                 LabeledContent("Height") {
                     HStack {
                         TextField("cm", value: $viewModel.heightCm, format: .number.precision(.fractionLength(0)))
@@ -38,6 +38,8 @@ struct BasicsStep: View {
                         Text("kg").foregroundStyle(.secondary)
                     }
                 }
+            } header: {
+                Text("Measurements")
             } footer: {
                 Text("You can switch to imperial units (lb, ft/in) in Settings later.")
             }

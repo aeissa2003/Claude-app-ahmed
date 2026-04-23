@@ -43,7 +43,7 @@ enum UnitConversion {
     static func formatHeight(cm: Double, units: UnitsPreference) -> String {
         switch units {
         case .metric:
-            String(format: "%.0f cm", cm)
+            return String(format: "%.0f cm", cm)
         case .imperial:
             let totalInches = cm / 2.54
             let feet = Int(totalInches / 12)

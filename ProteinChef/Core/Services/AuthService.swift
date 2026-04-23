@@ -14,6 +14,11 @@ protocol AuthServiceProtocol: Sendable {
     func signUpWithEmail(email: String, password: String, displayName: String) async throws -> AuthOutcome
     func sendPasswordReset(email: String) async throws
     func signOut() throws
+
+    /// Deletes the currently signed-in Firebase Auth user. Firestore docs are wiped
+    /// separately by the caller (see AccountDeletionService). May throw
+    /// AuthError.requiresRecentLogin if the session is stale.
+    func deleteCurrentUser() async throws
 }
 
 struct AuthOutcome: Sendable {
@@ -33,6 +38,7 @@ enum AuthError: Error, LocalizedError {
     case weakPassword
     case emailInUse
     case cancelled
+    case requiresRecentLogin
     case unknown(String)
 
     var errorDescription: String? {
@@ -43,6 +49,7 @@ enum AuthError: Error, LocalizedError {
         case .weakPassword:      "Password must be at least 6 characters."
         case .emailInUse:        "An account with that email already exists. Try signing in instead."
         case .cancelled:         "Sign-in cancelled."
+        case .requiresRecentLogin: "For security, sign out and sign back in, then try again."
         case .unknown(let msg):  msg
         }
     }

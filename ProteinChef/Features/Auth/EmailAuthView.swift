@@ -81,18 +81,34 @@ struct EmailAuthView: View {
             SecureField("Password", text: $password)
                 .textContentType(.password)
         } footer: {
-            Button("Forgot password?") { step = .reset; errorText = nil }
+            HStack {
+                Button("Create account") {
+                    step = .createAccount
+                    errorText = nil
+                }
+                Spacer()
+                Button("Forgot password?") { step = .reset; errorText = nil }
+            }
         }
     }
 
     @ViewBuilder
     private var createAccountSection: some View {
         Section {
-            Text("No account for \(email). Create one?")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
+            TextField("Email", text: $email)
+                .textContentType(.emailAddress)
+                .textInputAutocapitalization(.never)
+                .keyboardType(.emailAddress)
+                .autocorrectionDisabled()
+            SecureField("Password (min 6 chars)", text: $password)
+                .textContentType(.newPassword)
             TextField("Display name", text: $displayName)
                 .textContentType(.name)
+        } footer: {
+            Button("I already have an account") {
+                step = .credentials
+                errorText = nil
+            }
         }
     }
 

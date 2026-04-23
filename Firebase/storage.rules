@@ -1,6 +1,6 @@
 rules_version = '2';
 
-// Phase 1 starter rules. Phase 8 will harden.
+// Phase 8 hardened rules. Deploy with:  firebase deploy --only storage
 service firebase.storage {
   match /b/{bucket}/o {
 

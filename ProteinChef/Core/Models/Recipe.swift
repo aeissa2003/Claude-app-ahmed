@@ -11,7 +11,7 @@ struct RecipeStep: Codable, Hashable, Sendable, Identifiable {
     var text: String
 }
 
-struct Recipe: Codable, Identifiable, Sendable {
+struct Recipe: Codable, Identifiable, Hashable, Sendable {
     var id: String
     var ownerUid: String
     var title: String
