@@ -7,6 +7,7 @@ struct RecipePickerForLoggingSheet: View {
 
     let uid: String
     let day: Date
+    var initialMealType: MealType? = nil
     let onLogged: () -> Void
 
     @State private var recipes: [Recipe] = []
