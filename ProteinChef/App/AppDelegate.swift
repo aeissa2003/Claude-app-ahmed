@@ -8,7 +8,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
-        FirebaseApp.configure()
+        // FirebaseApp.configure() is called earlier from ProteinChefApp.init().
         UNUserNotificationCenter.current().delegate = self
         Messaging.messaging().delegate = self
         return true
