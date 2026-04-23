@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>ProteinChef · Redesign</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<style>
+  body { background: #EAE7DD; }
+  .canvas-bg {
+    min-height: 100vh;
+    padding: 40px 20px 60px;
+    background:
+      radial-gradient(1200px 600px at 50% -100px, rgba(43,46,255,0.05), transparent 60%),
+      #EAE7DD;
+  }
+  .canvas-title {
+    max-width: 1360px; margin: 0 auto 32px; padding: 0 12px;
+  }
+  .canvas-title h1 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700; font-size: 48px; letter-spacing: -0.035em; margin: 0;
+    color: #0E1014;
+  }
+  .canvas-title .meta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+    color: #5A5F6B; margin-top: 8px;
+  }
+  .canvas-title p {
+    font-family: 'Inter', sans-serif; color: #2A2D33; max-width: 680px;
+    margin-top: 16px; line-height: 1.6; font-size: 14px;
+  }
+  .section-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: #5A5F6B; margin: 40px 0 20px; padding-left: 4px;
+    border-top: 1px solid rgba(14,16,20,0.1); padding-top: 20px;
+  }
+  .row {
+    display: flex; gap: 40px; flex-wrap: wrap;
+    max-width: 1360px; margin: 0 auto; justify-content: flex-start; padding: 0 12px 20px;
+  }
+</style>
+</head>
+<body>
+  <div class="canvas-bg">
+    <div class="canvas-title">
+      <div class="meta">PROTEINCHEF · REDESIGN · V1</div>
+      <h1>Athletic editorial.</h1>
+      <p>A more professional, confident take. Deep indigo primary, chunky Space Grotesk display paired with Inter UI and JetBrains Mono data labels. Horizontal macro bars replace small rings. Per-screen layouts lean into big numbers, hairline dividers, and a calmer warm-paper background so the data earns the attention.</p>
+    </div>
+
+    <div class="section-label">01 · Today — daily dashboard</div>
+    <div class="row" id="row-today"></div>
+
+    <div class="section-label">02 · Recipes — list + detail + editor</div>
+    <div class="row" id="row-recipes"></div>
+
+    <div class="section-label">03 · Log meal — modal flows</div>
+    <div class="row" id="row-log"></div>
+
+    <div class="section-label">04 · Train — list + active workout</div>
+    <div class="row" id="row-train"></div>
+
+    <div class="section-label">05 · Feed — magazine grid + post detail</div>
+    <div class="row" id="row-feed"></div>
+
+    <div class="section-label">06 · Onboarding + settings</div>
+    <div class="row" id="row-onboard"></div>
+  </div>
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+  <script type="text/babel" src="components.jsx"></script>
+  <script type="text/babel" src="screens/today.jsx"></script>
+  <script type="text/babel" src="screens/recipes.jsx"></script>
+  <script type="text/babel" src="screens/log-meal.jsx"></script>
+  <script type="text/babel" src="screens/other.jsx"></script>
+
+  <script type="text/babel">
+    const { useState } = React;
+
+    // Component wrappers (hooks must live inside components, not render fns)
+    function TodayWithLog() {
+      const [logOpen, setLogOpen] = useState(false);
+      return (
+        <>
+          <TodayScreen onOpenLog={() => setLogOpen(true)}/>
+          {logOpen && (
+            <div style={{position:'absolute', inset: 0, zIndex: 100}}>
+              <LogMealSheet onClose={() => setLogOpen(false)} onLog={() => setLogOpen(false)}/>
+            </div>
+          )}
+        </>
+      );
+    }
+
+    // Interactive state — tapping certain elements drives prototype flows
+    function App() {
+      // Today — modal
+      const [logOpen, setLogOpen] = useState(false);
+
+      // Recipes — switch between list and detail
+      const [recipeView, setRecipeView] = useState('list'); // list | detail | editor
+
+      // Workouts — list vs active
+      const [workoutView, setWorkoutView] = useState('list'); // list | active
+
+      // Feed — list vs post
+      const [feedView, setFeedView] = useState('list'); // list | post
+
+      const phones = [
+        { row: 'row-today', width: 390, label: 'Today', content: (
+          <>
+            <TodayScreen onOpenLog={() => setLogOpen(true)}/>
+            {logOpen && (
+              <div style={{position:'absolute', inset: 0, zIndex: 100}}>
+                <LogMealSheet onClose={() => setLogOpen(false)} onLog={() => setLogOpen(false)}/>
+              </div>
+            )}
+          </>
+        )},
+
+        { row: 'row-recipes', label: 'Recipes · list', content: <RecipesListScreen onOpenRecipe={() => setRecipeView('detail')} onNew={() => setRecipeView('editor')}/> },
+        { row: 'row-recipes', label: 'Recipe · detail', content: <RecipeDetailScreen onBack={() => {}} onLog={() => {}}/> },
+        { row: 'row-recipes', label: 'Recipe · editor', content: <RecipeEditorScreen onBack={() => {}} onSave={() => {}}/> },
+
+        { row: 'row-log', label: 'Log · saved recipe', content: (
+          <div style={{position:'relative', width:'100%', height:'100%'}}>
+            <div style={{opacity: 0.4, pointerEvents:'none', height:'100%'}}><TodayScreen/></div>
+            <div style={{position:'absolute', inset: 0}}>
+              <LogMealSheet onClose={() => {}} onLog={() => {}}/>
+            </div>
+          </div>
+        )},
+
+        { row: 'row-train', label: 'Train · list', content: <WorkoutsListScreen onStart={() => {}} onTemplate={() => {}}/> },
+        { row: 'row-train', label: 'Train · active', dark: true, content: <ActiveWorkoutScreen onFinish={() => {}} onCancel={() => {}}/> },
+
+        { row: 'row-feed', label: 'Feed · magazine grid', content: <FeedScreen onOpenPost={() => {}}/> },
+        { row: 'row-feed', label: 'Feed · post detail', content: <FeedPostScreen onBack={() => {}}/> },
+
+        { row: 'row-onboard', label: 'Onboarding · step 3/6', content: <OnboardingScreen/> },
+        { row: 'row-onboard', label: 'Me · settings', content: <SettingsScreen/> },
+      ];
+
+      return null; // we mount per-row below
+    }
+
+    // Mount each phone into its row
+    const mounts = [
+      { row: 'row-today', label: 'Today', dark: false, render: () => <TodayWithLog/> },
+
+      { row: 'row-recipes', label: 'Recipes · list', render: () => <RecipesListScreen onOpenRecipe={() => {}} onNew={() => {}}/> },
+      { row: 'row-recipes', label: 'Recipe · detail', render: () => <RecipeDetailScreen onBack={() => {}} onLog={() => {}}/> },
+      { row: 'row-recipes', label: 'Recipe · editor', render: () => <RecipeEditorScreen onBack={() => {}} onSave={() => {}}/> },
+
+      { row: 'row-log', label: 'Log a meal (modal)', render: () => {
+        return (
+          <div style={{position:'relative', width:'100%', height:'100%'}}>
+            <div style={{opacity: 0.35, height:'100%'}}><TodayScreen/></div>
+            <div style={{position:'absolute', inset: 0}}>
+              <LogMealSheet onClose={() => {}} onLog={() => {}}/>
+            </div>
+          </div>
+        );
+      }},
+
+      { row: 'row-train', label: 'Train · list', render: () => <WorkoutsListScreen onStart={() => {}} onTemplate={() => {}}/> },
+      { row: 'row-train', label: 'Train · active workout', dark: true, render: () => <ActiveWorkoutScreen onFinish={() => {}} onCancel={() => {}}/> },
+
+      { row: 'row-feed', label: 'Feed · magazine grid', render: () => <FeedScreen onOpenPost={() => {}}/> },
+      { row: 'row-feed', label: 'Feed · post detail', render: () => <FeedPostScreen onBack={() => {}}/> },
+
+      { row: 'row-onboard', label: 'Onboarding · step 3 of 6', render: () => <OnboardingScreen/> },
+      { row: 'row-onboard', label: 'Me · settings', render: () => <SettingsScreen/> },
+    ];
+
+    mounts.forEach((m, i) => {
+      const rowEl = document.getElementById(m.row);
+      if (!rowEl) return;
+      const wrap = document.createElement('div');
+      rowEl.appendChild(wrap);
+      ReactDOM.createRoot(wrap).render(
+        <Phone width={390} height={844} label={m.label} dark={m.dark}>
+          {m.render()}
+        </Phone>
+      );
+    });
+  </script>
+</body>
+</html>
