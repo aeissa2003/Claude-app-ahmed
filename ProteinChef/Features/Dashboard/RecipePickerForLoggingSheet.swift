@@ -55,7 +55,7 @@ struct RecipePickerForLoggingSheet: View {
                 }
             }
             .sheet(item: $chosen) { recipe in
-                LogRecipeSheet(uid: uid, day: day, recipe: recipe, initialServings: 1) {
+                LogRecipeSheet(uid: uid, day: day, recipe: recipe, initialServings: 1, initialMealType: initialMealType) {
                     chosen = nil
                     onLogged()
                     dismiss()

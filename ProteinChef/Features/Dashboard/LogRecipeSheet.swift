@@ -10,6 +10,7 @@ struct LogRecipeSheet: View {
     let day: Date
     let recipe: Recipe
     let initialServings: Double
+    let initialMealType: MealType?
     var onLogged: (() -> Void)?
 
     @State private var servings: Double
@@ -22,14 +23,17 @@ struct LogRecipeSheet: View {
         day: Date,
         recipe: Recipe,
         initialServings: Double = 1,
+        initialMealType: MealType? = nil,
         onLogged: (() -> Void)? = nil
     ) {
         self.uid = uid
         self.day = day
         self.recipe = recipe
         self.initialServings = initialServings
+        self.initialMealType = initialMealType
         self.onLogged = onLogged
         _servings = State(initialValue: initialServings)
+        _mealType = State(initialValue: initialMealType)
     }
 
     private var computedMacros: Macros {
