@@ -7,6 +7,7 @@ struct DayDashboardView: View {
 
     @State private var vm: DayDashboardViewModel?
     @State private var suggestionTapped: RecipeSuggestion.Scored?
+    @State private var mealTypeToLog: MealType?
 
     var body: some View {
         Group {
@@ -31,34 +32,25 @@ struct DayDashboardView: View {
         }
     }
 
+    // MARK: - Content
+
     @ViewBuilder
     private func content(vm: DayDashboardViewModel) -> some View {
         let proteinGoal = profile?.proteinGoalG ?? 0
         let calorieGoal = profile?.calorieGoalKcal ?? 0
+        let consumed    = vm.consumed
 
         ScrollView {
-            VStack(alignment: .leading, spacing: Theme.Spacing.l) {
-                MacroRingsRow(
-                    consumed: vm.consumed,
-                    proteinGoalG: proteinGoal,
-                    calorieGoalKcal: calorieGoal,
-                    carbsGoalG: nil,
-                    fatGoalG: nil
-                )
-                .padding(.top, Theme.Spacing.s)
-
-                remainingSummary(vm: vm, proteinGoal: proteinGoal, calorieGoal: calorieGoal)
-
-                ForEach(MealType.allCases, id: \.self) { type in
-                    mealSection(vm: vm, type: type)
-                }
-
+            VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+                heroCard(consumed: consumed, goal: proteinGoal)
+                secondaryMacrosCard(consumed: consumed, calorieGoal: calorieGoal)
+                mealsSection(vm: vm)
                 if proteinGoal > 0 {
                     suggestionsSection(vm: vm, proteinGoal: proteinGoal)
                 }
             }
-            .padding(.horizontal)
-            .padding(.bottom, Theme.Spacing.xl)
+            .padding(.horizontal, Theme.Spacing.l)
+            .padding(.bottom, 140) // room for the tab bar
         }
         .alert("Couldn’t load", isPresented: .constant(vm.loadError != nil)) {
             Button("OK") { vm.loadError = nil }
@@ -76,78 +68,228 @@ struct DayDashboardView: View {
                 .environment(env)
             }
         }
-    }
-
-    private func remainingSummary(vm: DayDashboardViewModel, proteinGoal: Double, calorieGoal: Double) -> some View {
-        let remainingP = max(proteinGoal - vm.consumed.proteinG, 0)
-        let remainingC = max(calorieGoal - vm.consumed.kcal, 0)
-        return HStack(spacing: Theme.Spacing.m) {
-            statPill(title: "Protein left", value: "\(Int(remainingP)) g", color: Theme.Colors.protein)
-            statPill(title: "Calories left", value: "\(Int(remainingC))", color: Theme.Colors.kcal)
+        .sheet(item: $mealTypeToLog) { type in
+            if let uid = env.auth.currentUid {
+                LogMealSheet(uid: uid, day: day, initialMealType: type)
+                    .environment(env)
+            }
         }
     }
 
-    private func statPill(title: String, value: String, color: Color) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title).font(.caption).foregroundStyle(.secondary)
-            Text(value).font(.title3.bold()).foregroundStyle(color)
+    // MARK: - Hero card
+
+    private func heroCard(consumed: Macros, goal: Double) -> some View {
+        let remaining = max(goal - consumed.proteinG, 0)
+        let pct = goal > 0 ? Int(min(100, (consumed.proteinG / goal) * 100)) : 0
+        let onPace = pct >= paceTargetForNow()
+
+        return PCCard(style: .ink, padding: 20) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .top) {
+                    PCEyebrow(text: "Protein left", color: Theme.Colors.ink4)
+                    Spacer()
+                    Text(onPace ? "ON PACE" : "BEHIND")
+                        .font(Theme.Fonts.mono(9, weight: .semibold))
+                        .tracking(1.0)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(Theme.Colors.lime)
+                        .foregroundStyle(Theme.Colors.limeInk)
+                        .clipShape(Capsule())
+                }
+                HStack(alignment: .lastTextBaseline, spacing: 2) {
+                    Text("\(Int(remaining))")
+                        .font(Theme.Fonts.display(80))
+                        .tracking(-2.5)
+                        .foregroundStyle(Theme.Colors.lime)
+                    Text("g")
+                        .font(Theme.Fonts.display(22))
+                        .foregroundStyle(Color.white.opacity(0.7))
+                        .padding(.bottom, 16)
+                }
+                Text("\(Int(consumed.proteinG)) of \(Int(goal))g logged · \(pct)%")
+                    .font(Theme.Fonts.ui(13))
+                    .foregroundStyle(Color.white.opacity(0.65))
+
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Color.white.opacity(0.1))
+                        .frame(height: 10)
+                    GeometryReader { geo in
+                        Capsule()
+                            .fill(Theme.Colors.lime)
+                            .frame(width: min(1, consumed.proteinG / max(goal, 1)) * geo.size.width,
+                                   height: 10)
+                            .animation(.easeOut(duration: 0.6), value: consumed.proteinG)
+                    }
+                    .frame(height: 10)
+                }
+
+                HStack {
+                    Text("0")
+                        .font(Theme.Fonts.mono(10))
+                        .foregroundStyle(Color.white.opacity(0.55))
+                    Spacer()
+                    Text("\(Int(goal))g GOAL")
+                        .font(Theme.Fonts.mono(10))
+                        .tracking(0.8)
+                        .foregroundStyle(Color.white.opacity(0.55))
+                }
+            }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(Theme.Spacing.m)
-        .background(color.opacity(0.08))
-        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.m))
     }
+
+    private func paceTargetForNow() -> Int {
+        // Expect linear progress across the day: at noon, 50%.
+        let h = Calendar.current.component(.hour, from: Date())
+        return min(95, max(5, h * 100 / 24))
+    }
+
+    // MARK: - Secondary macros card (Calories / Carbs / Fat)
+
+    private func secondaryMacrosCard(consumed: Macros, calorieGoal: Double) -> some View {
+        PCCard(style: .paper, padding: 18) {
+            VStack(spacing: 16) {
+                macroRow(label: "Calories",
+                         current: consumed.kcal,
+                         goal: calorieGoal,
+                         unit: "kcal",
+                         tint: Theme.Colors.kcal)
+                macroRow(label: "Carbs",
+                         current: consumed.carbsG,
+                         goal: 260,
+                         unit: "g",
+                         tint: Theme.Colors.carbs)
+                macroRow(label: "Fat",
+                         current: consumed.fatG,
+                         goal: 70,
+                         unit: "g",
+                         tint: Theme.Colors.fat)
+            }
+        }
+    }
+
+    private func macroRow(label: String,
+                          current: Double,
+                          goal: Double,
+                          unit: String,
+                          tint: Color) -> some View {
+        let pct = goal > 0 ? Int(min(100, current / goal * 100)) : 0
+        let remaining = max(goal - current, 0)
+        return VStack(spacing: 6) {
+            HStack(alignment: .lastTextBaseline) {
+                PCEyebrow(text: label)
+                Spacer()
+                HStack(alignment: .lastTextBaseline, spacing: 4) {
+                    Text("\(Int(current))")
+                        .font(Theme.Fonts.display(22))
+                        .tracking(-0.5)
+                    Text("/ \(Int(goal)) \(unit)")
+                        .font(Theme.Fonts.ui(11))
+                        .foregroundStyle(Theme.Colors.ink3)
+                }
+            }
+            PCMacroBar(current: current, goal: goal, tint: tint, height: 8)
+            HStack {
+                Text("\(Int(remaining)) \(unit) left")
+                    .font(Theme.Fonts.ui(11))
+                    .foregroundStyle(Theme.Colors.ink3)
+                Spacer()
+                Text("\(pct)%")
+                    .font(Theme.Fonts.ui(11))
+                    .foregroundStyle(Theme.Colors.ink3)
+            }
+        }
+    }
+
+    // MARK: - Meals section
 
     @ViewBuilder
-    private func mealSection(vm: DayDashboardViewModel, type: MealType) -> some View {
-        let logs = vm.mealsOfType(type)
+    private func mealsSection(vm: DayDashboardViewModel) -> some View {
+        let totalLogged = vm.meals.count
         VStack(alignment: .leading, spacing: Theme.Spacing.s) {
-            HStack {
-                Text(type.rawValue.capitalized).font(.headline)
+            HStack(alignment: .lastTextBaseline) {
+                Text("Meals").font(Theme.Fonts.sectionTitle).tracking(-0.5)
                 Spacer()
-                if !logs.isEmpty {
-                    let m = logs.reduce(Macros.zero) { $0 + $1.computedMacros }
-                    Text("\(Int(m.proteinG))g P · \(Int(m.kcal)) kcal")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+                PCEyebrow(text: "\(totalLogged) logged")
             }
-            if logs.isEmpty {
-                Text("Nothing logged")
-                    .font(.footnote)
-                    .foregroundStyle(.tertiary)
-                    .padding(.vertical, 4)
-            } else {
-                ForEach(logs) { log in
-                    mealRow(log)
-                        .swipeActions(edge: .trailing) {
-                            Button(role: .destructive) {
-                                Task { await vm.delete(log) }
-                            } label: {
-                                Label("Delete", systemImage: "trash")
-                            }
-                        }
+            VStack(spacing: Theme.Spacing.s) {
+                ForEach(MealType.allCases, id: \.self) { type in
+                    mealCard(vm: vm, type: type)
                 }
             }
         }
-        .padding(Theme.Spacing.m)
-        .background(Color.secondary.opacity(0.06))
-        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.m))
+        .padding(.top, Theme.Spacing.s)
+    }
+
+    private func mealCard(vm: DayDashboardViewModel, type: MealType) -> some View {
+        let logs = vm.mealsOfType(type)
+        let m = logs.reduce(Macros.zero) { $0 + $1.computedMacros }
+
+        return PCCard(style: .paper, padding: 16) {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(type.rawValue.capitalized)
+                        .font(Theme.Fonts.cardTitle)
+                    Spacer()
+                    if logs.isEmpty {
+                        PCEyebrow(text: "Empty")
+                    } else {
+                        Text("\(Int(m.proteinG))g · \(Int(m.kcal)) kcal")
+                            .font(Theme.Fonts.mono(11))
+                            .foregroundStyle(Theme.Colors.ink3)
+                    }
+                }
+
+                if logs.isEmpty {
+                    HStack {
+                        PCChip(text: "Add", style: .neutral, systemImage: "plus") {
+                            mealTypeToLog = type
+                        }
+                        Spacer()
+                    }
+                } else {
+                    VStack(spacing: 0) {
+                        ForEach(logs) { log in
+                            mealRow(log)
+                                .padding(.vertical, 10)
+                                .overlay(
+                                    Rectangle()
+                                        .fill(Theme.Colors.line)
+                                        .frame(height: 1),
+                                    alignment: .bottom
+                                )
+                        }
+                    }
+                }
+            }
+        }
+        .contextMenu {
+            Button {
+                mealTypeToLog = type
+            } label: {
+                Label("Log \(type.rawValue.lowercased())", systemImage: "plus")
+            }
+        }
     }
 
     private func mealRow(_ log: MealLog) -> some View {
-        HStack {
+        HStack(alignment: .lastTextBaseline) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(title(log)).font(.subheadline)
-                Text(subtitle(log)).font(.caption).foregroundStyle(.secondary)
+                Text(title(log)).font(Theme.Fonts.bodyStrong)
+                Text(subtitle(log)).font(Theme.Fonts.mono(11)).foregroundStyle(Theme.Colors.ink3)
             }
             Spacer()
-            VStack(alignment: .trailing, spacing: 2) {
-                Text("\(Int(log.computedMacros.proteinG))g P").font(.caption.bold()).foregroundStyle(Theme.Colors.protein)
-                Text("\(Int(log.computedMacros.kcal)) kcal").font(.caption2).foregroundStyle(.secondary)
+            HStack(alignment: .lastTextBaseline, spacing: 4) {
+                Text("\(Int(log.computedMacros.proteinG))")
+                    .font(Theme.Fonts.display(22))
+                    .foregroundStyle(Theme.Colors.protein)
+                Text("g").font(Theme.Fonts.ui(11)).foregroundStyle(Theme.Colors.protein.opacity(0.8))
+                Text("\(Int(log.computedMacros.kcal)) kcal")
+                    .font(Theme.Fonts.mono(10))
+                    .foregroundStyle(Theme.Colors.ink3)
+                    .padding(.leading, 8)
             }
         }
-        .padding(.vertical, 6)
     }
 
     private func title(_ log: MealLog) -> String {
@@ -158,10 +300,10 @@ struct DayDashboardView: View {
 
     private func subtitle(_ log: MealLog) -> String {
         if let servings = log.servings {
-            return "\(formatted(servings)) serving\(servings == 1 ? "" : "s")"
+            return "\(formatted(servings)) SERVING\(servings == 1 ? "" : "S")"
         }
         if let adHoc = log.adHoc {
-            return "\(Int(adHoc.quantityG)) g"
+            return "\(Int(adHoc.quantityG)) G"
         }
         return ""
     }
@@ -170,43 +312,64 @@ struct DayDashboardView: View {
         v.truncatingRemainder(dividingBy: 1) == 0 ? "\(Int(v))" : String(format: "%.1f", v)
     }
 
+    // MARK: - Suggestions
+
     @ViewBuilder
     private func suggestionsSection(vm: DayDashboardViewModel, proteinGoal: Double) -> some View {
-        let suggestions = vm.suggestions(proteinGoalG: proteinGoal)
+        let suggestions = vm.suggestions(proteinGoalG: proteinGoal, limit: 6)
         if !suggestions.isEmpty {
             VStack(alignment: .leading, spacing: Theme.Spacing.s) {
-                Text("Suggestions")
-                    .font(.headline)
-                Text("Tap to log. Picks aim at your remaining protein target.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                ForEach(suggestions, id: \.recipe.id) { scored in
-                    suggestionRow(scored, day: vm.day)
+                HStack(alignment: .lastTextBaseline) {
+                    Text("Suggestions").font(Theme.Fonts.sectionTitle).tracking(-0.5)
+                    Spacer()
+                    PCEyebrow(text: "fit your goal")
+                }
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(suggestions, id: \.recipe.id) { scored in
+                            suggestionCard(scored)
+                        }
+                    }
+                    .padding(.vertical, 4)
                 }
             }
             .padding(.top, Theme.Spacing.s)
         }
     }
 
-    private func suggestionRow(_ scored: RecipeSuggestion.Scored, day: Date) -> some View {
+    private func suggestionCard(_ scored: RecipeSuggestion.Scored) -> some View {
         Button {
             suggestionTapped = scored
         } label: {
-            HStack(spacing: Theme.Spacing.m) {
-                RoundedRectangle(cornerRadius: Theme.Radius.s)
-                    .fill(Theme.Colors.protein.opacity(0.15))
-                    .frame(width: 40, height: 40)
-                    .overlay(Image(systemName: "flame.fill").foregroundStyle(Theme.Colors.protein))
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(scored.recipe.title).font(.subheadline).foregroundStyle(.primary)
-                    Text("\(formatted(scored.servings)) serving\(scored.servings == 1 ? "" : "s") · \(Int(scored.protein))g P")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 10) {
+                ZStack(alignment: .topLeading) {
+                    PCCoverImage(
+                        url: scored.recipe.coverPhotoURL,
+                        placeholderLabel: String(scored.recipe.title.prefix(10)),
+                        height: 120
+                    )
+                    if scored.recipe.isHighProtein {
+                        Text("HP")
+                            .font(Theme.Fonts.mono(9, weight: .semibold))
+                            .tracking(0.8)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 3)
+                            .background(Theme.Colors.lime)
+                            .foregroundStyle(Theme.Colors.limeInk)
+                            .clipShape(Capsule())
+                            .padding(10)
+                    }
                 }
-                Spacer()
-                Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary)
+                Text(scored.recipe.title)
+                    .font(Theme.Fonts.ui(14, weight: .semibold))
+                    .foregroundStyle(Theme.Colors.ink)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                Text("\(Int(scored.protein))g P · \(Int(scored.recipe.macrosPerServing.kcal)) kcal · \(formatted(scored.servings)) serv")
+                    .font(Theme.Fonts.mono(10))
+                    .foregroundStyle(Theme.Colors.ink3)
             }
-            .padding(.vertical, 6)
+            .frame(width: 180, alignment: .leading)
         }
         .buttonStyle(.plain)
     }
@@ -214,4 +377,8 @@ struct DayDashboardView: View {
 
 extension RecipeSuggestion.Scored: Identifiable {
     var id: String { recipe.id }
+}
+
+extension MealType: Identifiable {
+    public var id: String { rawValue }
 }
