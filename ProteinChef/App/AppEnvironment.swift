@@ -11,6 +11,7 @@ final class AppEnvironment {
     let userProfiles: UserProfileRepositoryProtocol
     let recipes: RecipeRepositoryProtocol
     let customIngredients: CustomIngredientRepositoryProtocol
+    let mealLogs: MealLogRepositoryProtocol
 
     let ingredientCatalog: IngredientCatalogProtocol
     let exerciseCatalog: ExerciseCatalogProtocol
@@ -23,6 +24,7 @@ final class AppEnvironment {
         userProfiles: UserProfileRepositoryProtocol,
         recipes: RecipeRepositoryProtocol,
         customIngredients: CustomIngredientRepositoryProtocol,
+        mealLogs: MealLogRepositoryProtocol,
         ingredientCatalog: IngredientCatalogProtocol,
         exerciseCatalog: ExerciseCatalogProtocol
     ) {
@@ -33,6 +35,7 @@ final class AppEnvironment {
         self.userProfiles = userProfiles
         self.recipes = recipes
         self.customIngredients = customIngredients
+        self.mealLogs = mealLogs
         self.ingredientCatalog = ingredientCatalog
         self.exerciseCatalog = exerciseCatalog
     }
@@ -46,6 +49,7 @@ final class AppEnvironment {
             userProfiles: FirebaseUserProfileRepository(),
             recipes: FirebaseRecipeRepository(),
             customIngredients: FirebaseCustomIngredientRepository(),
+            mealLogs: FirebaseMealLogRepository(),
             ingredientCatalog: BundledIngredientCatalog(),
             exerciseCatalog: BundledExerciseCatalog()
         )
