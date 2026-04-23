@@ -104,7 +104,7 @@ final class FirebaseAuthService: AuthServiceProtocol, @unchecked Sendable {
 
     private static func mapAuthError(_ err: NSError) -> AuthError {
         guard err.domain == AuthErrorDomain,
-              let code = AuthErrorCode(rawValue: err.code) else {
+              let code = AuthErrorCode.Code(rawValue: err.code) else {
             return .unknown(err.localizedDescription)
         }
         return switch code {
