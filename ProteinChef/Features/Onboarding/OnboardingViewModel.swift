@@ -41,6 +41,7 @@ final class OnboardingViewModel {
 
     enum HandleCheckState: Equatable {
         case idle, checking, available, taken, invalid
+        case failed(String)
     }
 
     var computedProteinGoal: Double {

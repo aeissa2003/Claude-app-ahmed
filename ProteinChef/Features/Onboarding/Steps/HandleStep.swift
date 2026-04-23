@@ -42,6 +42,9 @@ struct HandleStep: View {
         case .available:
             Label("Available!", systemImage: "checkmark.circle.fill")
                 .font(.footnote).foregroundStyle(.green)
+        case .failed(let message):
+            Label(message, systemImage: "wifi.exclamationmark")
+                .font(.footnote).foregroundStyle(.red)
         }
     }
 
@@ -67,7 +70,9 @@ struct HandleStep: View {
                     viewModel.handleCheckState = available ? .available : .taken
                 }
             } catch {
-                await MainActor.run { viewModel.handleCheckState = .invalid }
+                await MainActor.run {
+                    viewModel.handleCheckState = .failed(error.localizedDescription)
+                }
             }
         }
     }
