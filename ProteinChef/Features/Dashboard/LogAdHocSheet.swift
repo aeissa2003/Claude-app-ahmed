@@ -6,6 +6,7 @@ struct LogAdHocSheet: View {
 
     let uid: String
     let day: Date
+    var initialMealType: MealType? = nil
     var onLogged: (() -> Void)?
 
     @State private var mealType: MealType?
@@ -77,6 +78,7 @@ struct LogAdHocSheet: View {
             } message: {
                 Text(errorText ?? "")
             }
+            .onAppear { if mealType == nil { mealType = initialMealType } }
         }
     }
 

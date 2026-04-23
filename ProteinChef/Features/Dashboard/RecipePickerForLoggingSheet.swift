@@ -7,6 +7,7 @@ struct RecipePickerForLoggingSheet: View {
 
     let uid: String
     let day: Date
+    var initialMealType: MealType? = nil
     let onLogged: () -> Void
 
     @State private var recipes: [Recipe] = []
@@ -54,7 +55,7 @@ struct RecipePickerForLoggingSheet: View {
                 }
             }
             .sheet(item: $chosen) { recipe in
-                LogRecipeSheet(uid: uid, day: day, recipe: recipe, initialServings: 1) {
+                LogRecipeSheet(uid: uid, day: day, recipe: recipe, initialServings: 1, initialMealType: initialMealType) {
                     chosen = nil
                     onLogged()
                     dismiss()

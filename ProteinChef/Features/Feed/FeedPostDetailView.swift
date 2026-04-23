@@ -3,6 +3,7 @@ import SwiftUI
 struct FeedPostDetailView: View {
     @Environment(AppEnvironment.self) private var env
     @Environment(\.userProfile) private var profile
+    @Environment(\.dismiss) private var dismiss
 
     let post: FeedPost
     @State var liked: Bool
@@ -22,22 +23,26 @@ struct FeedPostDetailView: View {
     private var displayLikeCount: Int { post.likeCount + likeDelta }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: Theme.Spacing.l) {
-                authorHeader
-                if let caption = post.caption, !caption.isEmpty {
-                    Text(caption).font(.body)
+        ZStack(alignment: .bottom) {
+            Theme.Colors.bg.ignoresSafeArea()
+            ScrollView {
+                VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+                    cover
+                    VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+                        authorRow
+                        titleAndCaption
+                        recipeAttachment
+                        actionRow
+                        commentsSection
+                    }
+                    .padding(.horizontal, Theme.Spacing.l)
                 }
-                recipeBlock
-                actionRow
-                commentsSection
+                .padding(.bottom, 120)
             }
-            .padding(.horizontal)
-            .padding(.bottom, 120) // room for the comment bar
+            commentBar
         }
-        .safeAreaInset(edge: .bottom) { commentBar }
-        .navigationTitle("Post")
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
+        .toolbar(.hidden, for: .navigationBar)
         .task {
             async let a: () = subscribeComments()
             async let b: () = refreshLike()
@@ -48,185 +53,235 @@ struct FeedPostDetailView: View {
         } message: { Text(errorText ?? "") }
     }
 
-    // MARK: - Sections
+    // MARK: - Cover
 
-    private var authorHeader: some View {
-        HStack(spacing: Theme.Spacing.s) {
-            avatar
-            VStack(alignment: .leading, spacing: 0) {
-                Text(post.authorDisplayName).font(.subheadline.bold())
-                Text("@\(post.authorHandle)").font(.caption).foregroundStyle(.secondary)
-            }
-            Spacer()
-            Text(post.createdAt.formatted(date: .abbreviated, time: .shortened))
-                .font(.caption)
-                .foregroundStyle(.tertiary)
+    private var cover: some View {
+        ZStack(alignment: .topLeading) {
+            PCCoverImage(url: post.recipe.coverPhotoURL,
+                         placeholderLabel: "\(post.authorDisplayName) · \(post.recipe.title)",
+                         height: 320)
+            PCIconButton(systemName: "chevron.left", variant: .paper) { dismiss() }
+                .padding(.top, 56)
+                .padding(.leading, Theme.Spacing.l)
         }
-        .padding(.top, Theme.Spacing.s)
     }
 
-    @ViewBuilder private var avatar: some View {
+    // MARK: - Author
+
+    private var authorRow: some View {
+        HStack(spacing: 12) {
+            avatar(size: 44)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(post.authorDisplayName).font(Theme.Fonts.ui(15, weight: .semibold))
+                Text("@\(post.authorHandle) · \(relative(post.createdAt))")
+                    .font(Theme.Fonts.mono(11))
+                    .foregroundStyle(Theme.Colors.ink3)
+            }
+            Spacer()
+            if post.authorUid != profile?.id {
+                PCChip(text: "Follow", style: .active)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func avatar(size: CGFloat) -> some View {
         if let url = post.authorPhotoURL {
             AsyncImage(url: url) { phase in
                 switch phase {
                 case .success(let img): img.resizable().scaledToFill()
-                default: Color.secondary.opacity(0.1)
+                default: Theme.Colors.indigo
                 }
             }
-            .frame(width: 44, height: 44)
+            .frame(width: size, height: size)
             .clipShape(Circle())
         } else {
             Circle()
-                .fill(Color.secondary.opacity(0.15))
-                .frame(width: 44, height: 44)
-                .overlay(Image(systemName: "person.fill").foregroundStyle(.secondary))
+                .fill(Theme.Colors.indigo)
+                .frame(width: size, height: size)
+                .overlay(Text(String(post.authorDisplayName.prefix(1)).uppercased())
+                    .font(Theme.Fonts.display(16))
+                    .foregroundStyle(.white))
         }
     }
 
-    private var recipeBlock: some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.s) {
-            if let url = post.recipe.coverPhotoURL {
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .success(let img): img.resizable().scaledToFill()
-                    default: Color.secondary.opacity(0.1)
-                    }
-                }
-                .frame(height: 200)
-                .frame(maxWidth: .infinity)
-                .clipped()
-                .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.m))
-            }
-            Text(post.recipe.title).font(.title2.bold())
-            HStack(spacing: Theme.Spacing.m) {
-                macroChip("P", "\(Int(post.recipe.macrosPerServing.proteinG))g", Theme.Colors.protein)
-                macroChip("C", "\(Int(post.recipe.macrosPerServing.carbsG))g", Theme.Colors.carbs)
-                macroChip("F", "\(Int(post.recipe.macrosPerServing.fatG))g", Theme.Colors.fat)
-                macroChip("kcal", "\(Int(post.recipe.macrosPerServing.kcal))", Theme.Colors.kcal)
-            }
-            Text("\(Int(post.recipe.servings)) servings · \(post.recipe.prepMinutes + post.recipe.cookMinutes) min total")
-                .font(.caption).foregroundStyle(.secondary)
+    // MARK: - Title + caption
 
-            if !post.recipe.ingredients.isEmpty {
+    private var titleAndCaption: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(post.recipe.title)
+                .font(Theme.Fonts.display(28))
+                .tracking(-0.7)
+            if let caption = post.caption, !caption.isEmpty {
+                Text(caption)
+                    .font(Theme.Fonts.ui(15))
+                    .foregroundStyle(Theme.Colors.ink2)
+            }
+        }
+    }
+
+    // MARK: - Recipe attachment (ink card)
+
+    private var recipeAttachment: some View {
+        PCCard(style: .ink, padding: 14) {
+            HStack(spacing: 12) {
+                PCCoverImage(url: post.recipe.coverPhotoURL,
+                             placeholderLabel: String(post.recipe.title.prefix(6)),
+                             height: 80)
+                    .frame(width: 80)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Ingredients").font(.headline).padding(.top, 4)
-                    ForEach(post.recipe.ingredients) { ing in
-                        Text("• \(ing.ingredientName) — \(Int(ing.quantityG)) g")
-                            .font(.footnote)
-                    }
+                    Text(post.recipe.title)
+                        .font(Theme.Fonts.ui(14, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .lineLimit(2)
+                    Text("\(Int(post.recipe.macrosPerServing.proteinG))g P · \(Int(post.recipe.macrosPerServing.kcal)) kcal")
+                        .font(Theme.Fonts.mono(10))
+                        .foregroundStyle(Color.white.opacity(0.65))
                 }
-            }
-
-            if !post.recipe.instructions.isEmpty {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Instructions").font(.headline).padding(.top, 4)
-                    ForEach(post.recipe.instructions) { step in
-                        HStack(alignment: .top, spacing: 6) {
-                            Text("\(step.order + 1).").fontWeight(.semibold)
-                            Text(step.text)
-                        }
-                        .font(.footnote)
+                Spacer()
+                if post.authorUid != profile?.id {
+                    Button {
+                        Task { await saveCopy() }
+                    } label: {
+                        Text(savedCopy ? "Saved" : "Save copy")
+                            .font(Theme.Fonts.ui(12, weight: .semibold))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(Theme.Colors.lime)
+                            .foregroundStyle(Theme.Colors.limeInk)
+                            .clipShape(Capsule())
                     }
+                    .buttonStyle(.plain)
+                    .disabled(savedCopy || savingCopy)
                 }
             }
         }
     }
 
-    private func macroChip(_ label: String, _ value: String, _ color: Color) -> some View {
-        VStack(spacing: 2) {
-            Text(value).font(.footnote.bold()).foregroundStyle(color)
-            Text(label).font(.caption2).foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 6)
-        .background(color.opacity(0.08))
-        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.s))
-    }
+    // MARK: - Action row
 
     private var actionRow: some View {
-        HStack(spacing: Theme.Spacing.m) {
-            Button {
-                Task { await toggleLike() }
-            } label: {
-                Label("\(displayLikeCount)", systemImage: liked ? "heart.fill" : "heart")
-                    .foregroundStyle(liked ? .red : .primary)
-            }
-            .buttonStyle(.bordered)
-
-            if post.authorUid != profile?.id {
-                Button {
-                    Task { await saveCopy() }
-                } label: {
-                    Label(savedCopy ? "Saved" : "Save to my recipes",
-                          systemImage: savedCopy ? "checkmark" : "square.and.arrow.down")
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(Theme.Colors.protein)
-                .disabled(savedCopy || savingCopy)
-            }
-
+        HStack(spacing: 18) {
+            actionButton(
+                systemImage: liked ? "heart.fill" : "heart",
+                text: "\(displayLikeCount)",
+                tint: liked ? .red : Theme.Colors.ink,
+                action: { Task { await toggleLike() } }
+            )
+            actionButton(
+                systemImage: "bubble.left",
+                text: "\(post.commentCount)",
+                tint: Theme.Colors.ink,
+                action: {}
+            )
+            actionButton(
+                systemImage: "square.and.arrow.up",
+                text: "Share",
+                tint: Theme.Colors.ink,
+                action: {}
+            )
             Spacer()
         }
+        .padding(.top, 4)
     }
+
+    private func actionButton(systemImage: String,
+                              text: String,
+                              tint: Color,
+                              action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Image(systemName: systemImage).font(.system(size: 14))
+                Text(text).font(Theme.Fonts.mono(12, weight: .semibold))
+            }
+            .foregroundStyle(tint)
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Comments
 
     private var commentsSection: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.s) {
-            Text("Comments").font(.headline)
+            Text("Comments").font(Theme.Fonts.sectionTitle).tracking(-0.5)
             if comments.isEmpty {
                 Text("Be the first to comment.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(Theme.Fonts.ui(13))
+                    .foregroundStyle(Theme.Colors.ink3)
             } else {
-                ForEach(comments) { comment in
-                    commentRow(comment)
+                VStack(spacing: 12) {
+                    ForEach(comments) { commentRow($0) }
                 }
             }
         }
     }
 
     private func commentRow(_ c: FeedComment) -> some View {
-        HStack(alignment: .top, spacing: Theme.Spacing.s) {
+        HStack(alignment: .top, spacing: 10) {
             Circle()
-                .fill(Color.secondary.opacity(0.15))
-                .frame(width: 28, height: 28)
-                .overlay(Text(String(c.authorDisplayName.prefix(1))).font(.caption))
+                .fill(Theme.Colors.indigo)
+                .frame(width: 32, height: 32)
+                .overlay(Text(String(c.authorDisplayName.prefix(1)).uppercased())
+                    .font(Theme.Fonts.display(12))
+                    .foregroundStyle(.white))
             VStack(alignment: .leading, spacing: 2) {
-                HStack {
-                    Text(c.authorDisplayName).font(.caption.bold())
-                    Text("@\(c.authorHandle)").font(.caption2).foregroundStyle(.secondary)
+                HStack(spacing: 6) {
+                    Text(c.authorDisplayName).font(Theme.Fonts.ui(13, weight: .semibold))
+                    Text("@\(c.authorHandle)").font(Theme.Fonts.mono(10)).foregroundStyle(Theme.Colors.ink3)
                     Spacer()
+                    if c.authorUid == profile?.id {
+                        Button { Task { await deleteComment(c) } } label: {
+                            Image(systemName: "xmark").font(.system(size: 10)).foregroundStyle(Theme.Colors.ink3)
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
-                Text(c.text).font(.footnote)
-            }
-            if c.authorUid == profile?.id {
-                Button {
-                    Task { await deleteComment(c) }
-                } label: {
-                    Image(systemName: "xmark.circle").font(.caption).foregroundStyle(.tertiary)
-                }
-                .buttonStyle(.plain)
+                Text(c.text).font(Theme.Fonts.ui(13))
             }
         }
     }
 
+    // MARK: - Comment bar
+
     private var commentBar: some View {
-        HStack {
+        HStack(spacing: 10) {
             TextField("Write a comment", text: $newComment, axis: .vertical)
-                .textFieldStyle(.roundedBorder)
+                .font(Theme.Fonts.ui(14))
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(Theme.Colors.paper)
+                .overlay(Capsule().stroke(Theme.Colors.line, lineWidth: 1))
+                .clipShape(Capsule())
                 .lineLimit(1...4)
             Button {
                 Task { await postComment() }
             } label: {
-                if isPostingComment {
-                    ProgressView()
-                } else {
-                    Image(systemName: "paperplane.fill")
+                Group {
+                    if isPostingComment { ProgressView().tint(.white) }
+                    else { Image(systemName: "paperplane.fill").foregroundStyle(.white) }
                 }
+                .frame(width: 44, height: 44)
+                .background(newComment.trimmingCharacters(in: .whitespaces).isEmpty ? Theme.Colors.ink3 : Theme.Colors.indigo)
+                .clipShape(Circle())
             }
             .disabled(newComment.trimmingCharacters(in: .whitespaces).isEmpty || isPostingComment)
+            .buttonStyle(.plain)
         }
-        .padding()
-        .background(.regularMaterial)
+        .padding(.horizontal, Theme.Spacing.l)
+        .padding(.vertical, Theme.Spacing.s)
+        .background(
+            Theme.Colors.bg.opacity(0.96)
+                .background(.ultraThinMaterial)
+                .overlay(Divider().overlay(Theme.Colors.line), alignment: .top)
+        )
+    }
+
+    // MARK: - Helpers
+
+    private func relative(_ date: Date) -> String {
+        let f = RelativeDateTimeFormatter()
+        f.unitsStyle = .abbreviated
+        return f.localizedString(for: date, relativeTo: Date())
     }
 
     // MARK: - Actions
@@ -236,9 +291,7 @@ struct FeedPostDetailView: View {
             for try await list in env.feed.listCommentsStream(postId: post.id) {
                 comments = list
             }
-        } catch {
-            errorText = error.localizedDescription
-        }
+        } catch { errorText = error.localizedDescription }
     }
 
     private func refreshLike() async {
@@ -251,14 +304,9 @@ struct FeedPostDetailView: View {
         let wasLiked = liked
         do {
             liked = try await env.feed.toggleLike(postId: post.id, likerUid: uid)
-            if liked && !wasLiked {
-                likeDelta += 1
-            } else if !liked && wasLiked {
-                likeDelta -= 1
-            }
-        } catch {
-            errorText = error.localizedDescription
-        }
+            if liked && !wasLiked { likeDelta += 1 }
+            else if !liked && wasLiked { likeDelta -= 1 }
+        } catch { errorText = error.localizedDescription }
     }
 
     private func postComment() async {
@@ -270,17 +318,12 @@ struct FeedPostDetailView: View {
         do {
             try await env.feed.addComment(postId: post.id, author: me, text: text)
             newComment = ""
-        } catch {
-            errorText = error.localizedDescription
-        }
+        } catch { errorText = error.localizedDescription }
     }
 
     private func deleteComment(_ c: FeedComment) async {
-        do {
-            try await env.feed.deleteComment(postId: post.id, commentId: c.id)
-        } catch {
-            errorText = error.localizedDescription
-        }
+        do { try await env.feed.deleteComment(postId: post.id, commentId: c.id) }
+        catch { errorText = error.localizedDescription }
     }
 
     private func saveCopy() async {
@@ -314,8 +357,6 @@ struct FeedPostDetailView: View {
         do {
             try await env.recipes.save(copy)
             savedCopy = true
-        } catch {
-            errorText = error.localizedDescription
-        }
+        } catch { errorText = error.localizedDescription }
     }
 }

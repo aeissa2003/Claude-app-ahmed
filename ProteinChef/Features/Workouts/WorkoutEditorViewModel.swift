@@ -10,6 +10,8 @@ final class WorkoutEditorViewModel {
     var endedAt: Date?
     var exercises: [WorkoutExercise]
     var notes: String
+    var templateId: String?
+    var templateName: String?
 
     var isSaving: Bool = false
     var errorText: String?
@@ -22,10 +24,14 @@ final class WorkoutEditorViewModel {
             self.endedAt = workout.endedAt
             self.exercises = workout.exercises
             self.notes = workout.notes ?? ""
+            self.templateId = workout.templateId
+            self.templateName = workout.templateName
         } else if let template = seedTemplate {
             self.startedAt = Date()
             self.endedAt = nil
             self.notes = ""
+            self.templateId = template.id
+            self.templateName = template.name
             self.exercises = template.exercises.map { tex in
                 WorkoutExercise(
                     id: UUID().uuidString,
@@ -53,6 +59,8 @@ final class WorkoutEditorViewModel {
             self.endedAt = nil
             self.exercises = []
             self.notes = ""
+            self.templateId = nil
+            self.templateName = nil
         }
     }
 
@@ -134,8 +142,8 @@ final class WorkoutEditorViewModel {
             ownerUid: uid,
             startedAt: startedAt,
             endedAt: endedAt,
-            templateId: editing?.templateId,
-            templateName: editing?.templateName,
+            templateId: templateId,
+            templateName: templateName,
             exercises: exercises,
             notes: notes.isEmpty ? nil : notes,
             createdAt: editing?.createdAt ?? now,

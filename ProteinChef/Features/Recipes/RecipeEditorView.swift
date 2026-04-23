@@ -18,122 +18,202 @@ struct RecipeEditorView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            Form {
-                coverSection
-                basicsSection
-                macrosSection
-                ingredientsSection
-                instructionsSection
-                tagsSection
-                gallerySection
-            }
-            .navigationTitle(vm.editing == nil ? "New recipe" : "Edit recipe")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        Task { await save() }
+        ZStack(alignment: .bottom) {
+            Theme.Colors.bg.ignoresSafeArea()
+            VStack(spacing: 0) {
+                topBar
+                ScrollView {
+                    VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+                        coverBlock
+                        titleBlock
+                        quickStats
+                        ingredientsBlock
+                        stepsBlock
+                        tagsBlock
+                        galleryBlock
+                        Color.clear.frame(height: 120)
                     }
-                    .disabled(!vm.isValid || vm.isSaving)
+                    .padding(.horizontal, Theme.Spacing.l)
+                    .padding(.top, Theme.Spacing.s)
                 }
             }
-            .overlay { if vm.isSaving { savingOverlay } }
-            .photoPicker(isPresented: $showingCoverPicker) { image in
-                vm.setCoverImage(image)
+            liveMacrosCard
+        }
+        .overlay { if vm.isSaving { savingOverlay } }
+        .photoPicker(isPresented: $showingCoverPicker) { image in
+            vm.setCoverImage(image)
+        }
+        .photoPicker(isPresented: $showingGalleryPicker) { image in
+            vm.addGalleryImage(image)
+        }
+        .photoPicker(isPresented: $showingIngredientPhotoPicker) { image in
+            if let id = ingredientPhotoPickerTargetId {
+                vm.setIngredientImage(image, for: id)
             }
-            .photoPicker(isPresented: $showingGalleryPicker) { image in
-                vm.addGalleryImage(image)
+            ingredientPhotoPickerTargetId = nil
+        }
+        .sheet(isPresented: $showingIngredientPicker) {
+            IngredientPickerView { newIngredient in
+                vm.addIngredient(newIngredient)
             }
-            .photoPicker(isPresented: $showingIngredientPhotoPicker) { image in
-                if let id = ingredientPhotoPickerTargetId {
-                    vm.setIngredientImage(image, for: id)
+            .environment(env)
+        }
+        .sheet(item: $editingIngredient) { ing in
+            IngredientPickerView(editing: ing) { updated in
+                vm.updateIngredient(updated)
+            }
+            .environment(env)
+        }
+        .alert("Couldn’t save", isPresented: .constant(vm.errorText != nil)) {
+            Button("OK") { vm.errorText = nil }
+        } message: { Text(vm.errorText ?? "") }
+    }
+
+    // MARK: - Top bar
+
+    private var topBar: some View {
+        HStack {
+            PCIconButton(systemName: "xmark", variant: .paper) { dismiss() }
+            Spacer()
+            PCEyebrow(text: vm.editing == nil ? "New recipe" : "Edit recipe")
+            Spacer()
+            Button {
+                Task { await save() }
+            } label: {
+                Text("Save")
+                    .font(Theme.Fonts.ui(14, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 10)
+                    .background(vm.isValid ? Theme.Colors.indigo : Theme.Colors.ink3)
+                    .clipShape(Capsule())
+            }
+            .disabled(!vm.isValid || vm.isSaving)
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, Theme.Spacing.l)
+        .padding(.vertical, Theme.Spacing.s)
+    }
+
+    // MARK: - Cover
+
+    private var coverBlock: some View {
+        Button {
+            showingCoverPicker = true
+        } label: {
+            ZStack {
+                if let image = vm.pendingImages["cover"] {
+                    Image(uiImage: image)
+                        .resizable().scaledToFill()
+                        .frame(height: 200)
+                        .frame(maxWidth: .infinity)
+                        .clipped()
+                        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.l))
+                } else if let url = vm.coverPhotoURL {
+                    AsyncImage(url: url) { phase in
+                        switch phase {
+                        case .success(let img): img.resizable().scaledToFill()
+                        default: dashedPlaceholder
+                        }
+                    }
+                    .frame(height: 200)
+                    .frame(maxWidth: .infinity)
+                    .clipped()
+                    .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.l))
+                } else {
+                    dashedPlaceholder
                 }
-                ingredientPhotoPickerTargetId = nil
             }
-            .sheet(isPresented: $showingIngredientPicker) {
-                IngredientPickerView { newIngredient in
-                    vm.addIngredient(newIngredient)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var dashedPlaceholder: some View {
+        RoundedRectangle(cornerRadius: Theme.Radius.l)
+            .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
+            .foregroundStyle(Theme.Colors.line2)
+            .frame(height: 200)
+            .overlay {
+                VStack(spacing: 6) {
+                    Image(systemName: "camera.fill")
+                        .font(.system(size: 22, weight: .medium))
+                        .foregroundStyle(Theme.Colors.ink3)
+                    Text("Tap to add cover")
+                        .font(Theme.Fonts.mono(11))
+                        .tracking(1.0)
+                        .foregroundStyle(Theme.Colors.ink3)
                 }
-                .environment(env)
             }
-            .sheet(item: $editingIngredient) { ing in
-                IngredientPickerView(editing: ing) { updated in
-                    vm.updateIngredient(updated)
-                }
-                .environment(env)
-            }
-            .alert("Couldn’t save", isPresented: .constant(vm.errorText != nil)) {
-                Button("OK") { vm.errorText = nil }
-            } message: {
-                Text(vm.errorText ?? "")
-            }
+    }
+
+    // MARK: - Title
+
+    private var titleBlock: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            TextField("Recipe name", text: $vm.title)
+                .font(Theme.Fonts.display(26))
+                .foregroundStyle(Theme.Colors.ink)
+            Rectangle()
+                .fill(Theme.Colors.line2)
+                .frame(height: 1)
         }
     }
 
-    // MARK: - Sections
+    // MARK: - Quick stats
 
-    @ViewBuilder private var coverSection: some View {
-        Section {
-            coverPreview
-                .onTapGesture { showingCoverPicker = true }
-        } footer: {
-            Text("Tap to add a cover photo")
+    private var quickStats: some View {
+        HStack(spacing: 10) {
+            quickStatCell(label: "Servings",
+                          value: servingsLabel,
+                          onMinus: { if vm.servings > 1 { vm.servings -= 1 } },
+                          onPlus:  { vm.servings += 1 })
+            quickStatCell(label: "Prep",
+                          value: "\(vm.prepMinutes) min",
+                          onMinus: { vm.prepMinutes = max(0, vm.prepMinutes - 5) },
+                          onPlus:  { vm.prepMinutes += 5 })
+            quickStatCell(label: "Cook",
+                          value: "\(vm.cookMinutes) min",
+                          onMinus: { vm.cookMinutes = max(0, vm.cookMinutes - 5) },
+                          onPlus:  { vm.cookMinutes += 5 })
         }
     }
 
-    @ViewBuilder private var coverPreview: some View {
-        ZStack {
-            if let image = vm.pendingImages["cover"] {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-            } else if let url = vm.coverPhotoURL {
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .success(let img): img.resizable().scaledToFill()
-                    default: placeholder
-                    }
+    private func quickStatCell(label: String,
+                               value: String,
+                               onMinus: @escaping () -> Void,
+                               onPlus: @escaping () -> Void) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            PCEyebrow(text: label)
+            HStack(spacing: 8) {
+                Button(action: onMinus) {
+                    Image(systemName: "minus")
+                        .font(.system(size: 11, weight: .bold))
+                        .frame(width: 22, height: 22)
+                        .background(Theme.Colors.ink.opacity(0.08))
+                        .clipShape(Circle())
                 }
-            } else {
-                placeholder
+                .buttonStyle(.plain)
+                Text(value)
+                    .font(Theme.Fonts.display(18))
+                    .frame(maxWidth: .infinity)
+                Button(action: onPlus) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 11, weight: .bold))
+                        .frame(width: 22, height: 22)
+                        .background(Theme.Colors.ink.opacity(0.08))
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
             }
         }
-        .frame(height: 180)
+        .padding(12)
         .frame(maxWidth: .infinity)
-        .clipped()
+        .background(Theme.Colors.paper)
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.Radius.m)
+                .stroke(Theme.Colors.line, lineWidth: 1)
+        )
         .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.m))
-        .contentShape(RoundedRectangle(cornerRadius: Theme.Radius.m))
-    }
-
-    private var placeholder: some View {
-        ZStack {
-            Color.secondary.opacity(0.1)
-            VStack(spacing: 6) {
-                Image(systemName: "photo")
-                    .font(.title2)
-                    .foregroundStyle(.secondary)
-                Text("Add cover photo").font(.caption).foregroundStyle(.secondary)
-            }
-        }
-    }
-
-    private var basicsSection: some View {
-        Section("Basics") {
-            TextField("Title", text: $vm.title)
-            Stepper(value: $vm.prepMinutes, in: 0...240, step: 5) {
-                HStack { Text("Prep"); Spacer(); Text("\(vm.prepMinutes) min").foregroundStyle(.secondary) }
-            }
-            Stepper(value: $vm.cookMinutes, in: 0...240, step: 5) {
-                HStack { Text("Cook"); Spacer(); Text("\(vm.cookMinutes) min").foregroundStyle(.secondary) }
-            }
-            Stepper(value: $vm.servings, in: 1...50, step: 1) {
-                HStack { Text("Servings"); Spacer(); Text(servingsLabel).foregroundStyle(.secondary) }
-            }
-        }
     }
 
     private var servingsLabel: String {
@@ -142,138 +222,140 @@ struct RecipeEditorView: View {
             : String(format: "%.1f", vm.servings)
     }
 
-    private var macrosSection: some View {
-        Section("Per serving") {
-            HStack(spacing: Theme.Spacing.m) {
-                macroCell("Protein", "\(Int(vm.perServing.proteinG))g", Theme.Colors.protein)
-                macroCell("Carbs",   "\(Int(vm.perServing.carbsG))g",   Theme.Colors.carbs)
-                macroCell("Fat",     "\(Int(vm.perServing.fatG))g",     Theme.Colors.fat)
-                macroCell("Kcal",    "\(Int(vm.perServing.kcal))",       Theme.Colors.kcal)
-            }
-            .padding(.vertical, 4)
-        }
-    }
+    // MARK: - Ingredients
 
-    private func macroCell(_ label: String, _ value: String, _ color: Color) -> some View {
-        VStack(spacing: 2) {
-            Text(value).font(.subheadline.bold()).foregroundStyle(color)
-            Text(label).font(.caption2).foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 6)
-        .background(color.opacity(0.08))
-        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.s))
-    }
-
-    private var ingredientsSection: some View {
-        Section {
-            ForEach(vm.ingredients) { ing in
-                ingredientRow(ing)
-                    .contentShape(Rectangle())
-                    .onTapGesture { editingIngredient = ing }
-            }
-            .onDelete(perform: vm.removeIngredient)
-
-            Button {
-                showingIngredientPicker = true
-            } label: {
-                Label("Add ingredient", systemImage: "plus.circle.fill")
-            }
-        } header: {
-            Text("Ingredients")
-        } footer: {
-            if vm.ingredients.isEmpty {
-                Text("At least one ingredient is required.")
-            }
-        }
-    }
-
-    private func ingredientRow(_ ing: RecipeIngredient) -> some View {
-        HStack(spacing: Theme.Spacing.s) {
-            ingredientThumb(ing)
-                .onTapGesture {
-                    ingredientPhotoPickerTargetId = ing.id
-                    showingIngredientPhotoPicker = true
+    private var ingredientsBlock: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.s) {
+            HStack(alignment: .lastTextBaseline) {
+                Text("Ingredients").font(Theme.Fonts.sectionTitle).tracking(-0.5)
+                Spacer()
+                PCChip(text: "Add", style: .active, systemImage: "plus") {
+                    showingIngredientPicker = true
                 }
-            VStack(alignment: .leading, spacing: 2) {
-                Text(ing.ingredientName).font(.subheadline)
-                Text(quantityLabel(ing) + " · \(Int(ing.macrosAtEntry.proteinG))g P · \(Int(ing.macrosAtEntry.kcal)) kcal")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
-            Spacer()
-            Image(systemName: "chevron.right")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
-        }
-    }
-
-    @ViewBuilder private func ingredientThumb(_ ing: RecipeIngredient) -> some View {
-        Group {
-            if let image = vm.pendingImages[ing.id] {
-                Image(uiImage: image).resizable().scaledToFill()
-            } else if let url = ing.photoURL {
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .success(let img): img.resizable().scaledToFill()
-                    default: Color.secondary.opacity(0.1)
+            if vm.ingredients.isEmpty {
+                Text("Add at least one ingredient — macros auto-calc from the catalog.")
+                    .font(Theme.Fonts.ui(13))
+                    .foregroundStyle(Theme.Colors.ink3)
+                    .padding(.vertical, 8)
+            } else {
+                VStack(spacing: 8) {
+                    ForEach(Array(vm.ingredients.enumerated()), id: \.element.id) { idx, ing in
+                        ingredientRow(index: idx + 1, ing: ing)
                     }
                 }
-            } else {
-                ZStack {
-                    Color.secondary.opacity(0.1)
-                    Image(systemName: "camera").font(.caption).foregroundStyle(.secondary)
-                }
             }
         }
-        .frame(width: 40, height: 40)
-        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.s))
     }
 
-    private func quantityLabel(_ ing: RecipeIngredient) -> String {
-        let q = ing.displayQuantity
-        let formatted = q.truncatingRemainder(dividingBy: 1) == 0
-            ? "\(Int(q))"
-            : String(format: "%.2f", q)
-        return "\(formatted) \(ing.displayUnit)"
-    }
+    private func ingredientRow(index: Int, ing: RecipeIngredient) -> some View {
+        HStack(spacing: 12) {
+            Text("\(index)")
+                .font(Theme.Fonts.display(14))
+                .foregroundStyle(Theme.Colors.protein)
+                .frame(width: 26, height: 26)
+                .background(Theme.Colors.protein.opacity(0.15))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
 
-    private var instructionsSection: some View {
-        Section("Instructions") {
-            ForEach($vm.instructions) { $step in
-                HStack(alignment: .top, spacing: Theme.Spacing.s) {
-                    Text("\(step.order + 1).").fontWeight(.semibold).padding(.top, 8)
-                    TextField("Step", text: $step.text, axis: .vertical)
-                        .lineLimit(1...6)
+            Button { editingIngredient = ing } label: {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(ing.ingredientName)
+                        .font(Theme.Fonts.bodyStrong)
+                        .foregroundStyle(Theme.Colors.ink)
+                    Text("\(Int(ing.quantityG)) g · \(Int(ing.macrosAtEntry.kcal)) kcal")
+                        .font(Theme.Fonts.mono(11))
+                        .foregroundStyle(Theme.Colors.ink3)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .onDelete(perform: vm.removeInstruction)
+            .buttonStyle(.plain)
+
+            Text("\(Int(ing.macrosAtEntry.proteinG))g")
+                .font(Theme.Fonts.display(16))
+                .foregroundStyle(Theme.Colors.protein)
 
             Button {
-                vm.addInstruction()
+                if let idx = vm.ingredients.firstIndex(where: { $0.id == ing.id }) {
+                    vm.removeIngredient(at: IndexSet(integer: idx))
+                }
             } label: {
-                Label("Add step", systemImage: "plus.circle.fill")
+                Image(systemName: "xmark").font(.system(size: 12)).foregroundStyle(Theme.Colors.ink3)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(12)
+        .background(Theme.Colors.paper)
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.Radius.m)
+                .stroke(Theme.Colors.line, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.m))
+    }
+
+    // MARK: - Steps
+
+    private var stepsBlock: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.s) {
+            HStack(alignment: .lastTextBaseline) {
+                Text("Method").font(Theme.Fonts.sectionTitle).tracking(-0.5)
+                Spacer()
+                PCChip(text: "Add step", style: .outlined, systemImage: "plus") {
+                    vm.addInstruction()
+                }
+            }
+            VStack(spacing: 8) {
+                ForEach($vm.instructions) { $step in
+                    HStack(alignment: .top, spacing: 12) {
+                        Text(String(format: "%02d", step.order + 1))
+                            .font(Theme.Fonts.display(22))
+                            .foregroundStyle(Theme.Colors.indigo)
+                            .padding(.top, 4)
+                        TextField("Step", text: $step.text, axis: .vertical)
+                            .font(Theme.Fonts.ui(14))
+                            .lineLimit(1...6)
+                        Button {
+                            if let idx = vm.instructions.firstIndex(where: { $0.id == step.id }) {
+                                vm.removeInstruction(at: IndexSet(integer: idx))
+                            }
+                        } label: {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 12))
+                                .foregroundStyle(Theme.Colors.ink3)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .padding(12)
+                    .background(Theme.Colors.paper)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Theme.Radius.m)
+                            .stroke(Theme.Colors.line, lineWidth: 1)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.m))
+                }
             }
         }
     }
 
-    private var tagsSection: some View {
-        Section("Tags") {
+    // MARK: - Tags
+
+    private var tagsBlock: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.s) {
+            Text("Tags").font(Theme.Fonts.sectionTitle).tracking(-0.5)
             if !vm.tags.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: Theme.Spacing.xs) {
+                    HStack(spacing: 6) {
                         ForEach(vm.tags, id: \.self) { tag in
                             HStack(spacing: 4) {
-                                Text("#\(tag)").font(.caption)
-                                Button {
-                                    vm.removeTag(tag)
-                                } label: {
-                                    Image(systemName: "xmark.circle.fill").font(.caption)
+                                Text(tag).font(Theme.Fonts.ui(12, weight: .medium))
+                                Button { vm.removeTag(tag) } label: {
+                                    Image(systemName: "xmark").font(.system(size: 9))
                                 }
                                 .buttonStyle(.plain)
                             }
-                            .padding(.horizontal, 10).padding(.vertical, 4)
-                            .background(Color.secondary.opacity(0.12))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(Theme.Colors.paper)
+                            .overlay(Capsule().stroke(Theme.Colors.line, lineWidth: 1))
                             .clipShape(Capsule())
                         }
                     }
@@ -282,45 +364,52 @@ struct RecipeEditorView: View {
             HStack {
                 TextField("Add a tag", text: $vm.tagInput)
                     .textInputAutocapitalization(.never)
+                    .padding(10)
+                    .background(Theme.Colors.paper)
+                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Theme.Colors.line, lineWidth: 1))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
                     .onSubmit { vm.addTag() }
                 Button("Add") { vm.addTag() }
+                    .font(Theme.Fonts.ui(14, weight: .semibold))
                     .disabled(vm.tagInput.trimmingCharacters(in: .whitespaces).isEmpty)
             }
         }
     }
 
-    private var gallerySection: some View {
-        Section("Gallery") {
+    // MARK: - Gallery
+
+    private var galleryBlock: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.s) {
+            HStack(alignment: .lastTextBaseline) {
+                Text("Gallery").font(Theme.Fonts.sectionTitle).tracking(-0.5)
+                Spacer()
+                PCChip(text: "Add photo", style: .outlined, systemImage: "plus") {
+                    showingGalleryPicker = true
+                }
+            }
             if !vm.galleryPhotoURLs.isEmpty || hasPendingGallery {
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: Theme.Spacing.s) {
+                    HStack(spacing: 8) {
                         ForEach(vm.galleryPhotoURLs, id: \.self) { url in
                             AsyncImage(url: url) { phase in
                                 switch phase {
                                 case .success(let img): img.resizable().scaledToFill()
-                                default: Color.secondary.opacity(0.1)
+                                default: Theme.Colors.ink.opacity(0.05)
                                 }
                             }
-                            .frame(width: 100, height: 100)
-                            .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.s))
+                            .frame(width: 110, height: 110)
+                            .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.m))
                         }
                         ForEach(pendingGalleryKeys, id: \.self) { key in
                             if let image = vm.pendingImages[key] {
                                 Image(uiImage: image)
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(width: 100, height: 100)
-                                    .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.s))
+                                    .resizable().scaledToFill()
+                                    .frame(width: 110, height: 110)
+                                    .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.m))
                             }
                         }
                     }
-                    .padding(.vertical, 4)
                 }
-            }
-            Button {
-                showingGalleryPicker = true
-            } label: {
-                Label("Add photo to gallery", systemImage: "plus.circle.fill")
             }
         }
     }
@@ -330,25 +419,56 @@ struct RecipeEditorView: View {
     }
 
     private var pendingGalleryKeys: [String] {
-        vm.pendingImages.keys
-            .filter { $0.hasPrefix("gallery-") }
-            .sorted()
+        vm.pendingImages.keys.filter { $0.hasPrefix("gallery-") }.sorted()
     }
 
-    private var savingOverlay: some View {
-        ZStack {
-            Color.black.opacity(0.3).ignoresSafeArea()
-            VStack(spacing: Theme.Spacing.s) {
-                ProgressView()
-                Text("Saving…").font(.footnote).foregroundStyle(.white)
+    // MARK: - Live macros
+
+    private var liveMacrosCard: some View {
+        PCCard(style: .ink, padding: 14) {
+            HStack(spacing: 14) {
+                VStack(alignment: .leading, spacing: 2) {
+                    PCEyebrow(text: "Per serving", color: Theme.Colors.ink4)
+                    HStack(alignment: .lastTextBaseline, spacing: 2) {
+                        Text("\(Int(vm.perServing.proteinG))")
+                            .font(Theme.Fonts.display(28))
+                            .foregroundStyle(Theme.Colors.lime)
+                        Text("g P")
+                            .font(Theme.Fonts.ui(11))
+                            .foregroundStyle(Color.white.opacity(0.7))
+                    }
+                    Text("\(Int(vm.perServing.kcal)) kcal · \(Int(vm.perServing.carbsG))C · \(Int(vm.perServing.fatG))F")
+                        .font(Theme.Fonts.mono(10))
+                        .foregroundStyle(Color.white.opacity(0.55))
+                }
+                Spacer()
+                if vm.perServing.proteinG >= 25 {
+                    Text("HIGH PROTEIN")
+                        .font(Theme.Fonts.mono(9, weight: .semibold))
+                        .tracking(1.0)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(Theme.Colors.lime)
+                        .foregroundStyle(Theme.Colors.limeInk)
+                        .clipShape(Capsule())
+                }
             }
-            .padding(24)
-            .background(.ultraThinMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.m))
         }
+        .padding(.horizontal, Theme.Spacing.l)
+        .padding(.bottom, Theme.Spacing.m)
     }
 
     // MARK: - Save
+
+    private var savingOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.4).ignoresSafeArea()
+            ProgressView("Saving…")
+                .padding(24)
+                .background(Theme.Colors.paper)
+                .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.m))
+        }
+    }
 
     private func save() async {
         vm.isSaving = true

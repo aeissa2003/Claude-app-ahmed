@@ -1,8 +1,10 @@
 import Combine
 import SwiftUI
 
-/// Live-session workout view. Shares the editor view model, but adds an elapsed-time
-/// header, a manually-started rest timer, and a Finish action that sets endedAt.
+/// Live-session workout view — dark surface per the redesign. Shares the editor
+/// view model, adds an elapsed-time header, a rest timer pill, exercise cards
+/// with the numbered-set / KG / REPS grid, and a Finish action that sets
+/// endedAt and persists the workout.
 struct ActiveWorkoutView: View {
     @Environment(AppEnvironment.self) private var env
     @Environment(\.userProfile) private var profile
@@ -20,84 +22,101 @@ struct ActiveWorkoutView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            Form {
-                elapsedHeader
-                restSection
-
-                ForEach($vm.exercises) { $exercise in
-                    exerciseSection(exercise: $exercise)
-                }
-
-                Section {
-                    Button {
-                        showingExercisePicker = true
-                    } label: {
-                        Label("Add exercise", systemImage: "plus.circle.fill")
+        ZStack {
+            Theme.Colors.darkBg.ignoresSafeArea()
+            VStack(spacing: 0) {
+                topBar
+                ScrollView {
+                    VStack(spacing: Theme.Spacing.md) {
+                        restPill
+                        ForEach($vm.exercises) { $exercise in
+                            exerciseCard(exercise: $exercise)
+                        }
+                        addExerciseRow
+                        notesBlock
+                        Color.clear.frame(height: 40)
                     }
-                }
-
-                Section("Notes") {
-                    TextField("Optional notes", text: $vm.notes, axis: .vertical)
-                        .lineLimit(1...6)
+                    .padding(.horizontal, Theme.Spacing.l)
+                    .padding(.top, Theme.Spacing.s)
                 }
             }
-            .navigationTitle("Active workout")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { showingCancelConfirm = true }
-                }
-                ToolbarItem(placement: .primaryAction) {
-                    Button("Finish") { showingFinishConfirm = true }
-                        .fontWeight(.semibold)
-                        .disabled(!vm.isValid || vm.isSaving)
-                }
-            }
-            .sheet(isPresented: $showingExercisePicker) {
-                ExercisePickerView { picked in
-                    vm.addExercise(picked)
-                }
-                .environment(env)
-            }
-            .alert("Finish workout?", isPresented: $showingFinishConfirm) {
-                Button("Finish") { Task { await finish() } }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("Saves the session and stops the timer.")
-            }
-            .alert("Discard workout?", isPresented: $showingCancelConfirm) {
-                Button("Discard", role: .destructive) {
-                    rest.stop()
-                    dismiss()
-                }
-                Button("Keep editing", role: .cancel) {}
-            }
-            .alert("Couldn’t save", isPresented: .constant(vm.errorText != nil)) {
-                Button("OK") { vm.errorText = nil }
-            } message: { Text(vm.errorText ?? "") }
-            .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { t in
-                now = t
-            }
-            .onDisappear { rest.stop() }
         }
+        .preferredColorScheme(.dark)
+        .sheet(isPresented: $showingExercisePicker) {
+            ExercisePickerView { picked in
+                vm.addExercise(picked)
+            }
+            .environment(env)
+        }
+        .alert("Finish workout?", isPresented: $showingFinishConfirm) {
+            Button("Finish") { Task { await finish() } }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Saves the session and stops the timer.")
+        }
+        .alert("Discard workout?", isPresented: $showingCancelConfirm) {
+            Button("Discard", role: .destructive) {
+                rest.stop()
+                dismiss()
+            }
+            Button("Keep editing", role: .cancel) {}
+        }
+        .alert("Couldn’t save", isPresented: .constant(vm.errorText != nil)) {
+            Button("OK") { vm.errorText = nil }
+        } message: { Text(vm.errorText ?? "") }
+        .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { t in
+            now = t
+        }
+        .onDisappear { rest.stop() }
     }
 
-    // MARK: - Sections
+    // MARK: - Top bar
 
-    private var elapsedHeader: some View {
-        Section {
-            VStack(spacing: 6) {
-                Text(elapsedText)
-                    .font(.system(size: 44, weight: .bold, design: .rounded))
-                    .foregroundStyle(Theme.Colors.protein)
-                    .monospacedDigit()
-                Text("Started \(vm.startedAt.formatted(date: .omitted, time: .shortened))")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+    private var topBar: some View {
+        HStack(alignment: .center) {
+            Button { showingCancelConfirm = true } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 14, weight: .semibold))
+                    .frame(width: 36, height: 36)
+                    .foregroundStyle(.white)
+                    .background(Color.white.opacity(0.08))
+                    .clipShape(Circle())
             }
-            .frame(maxWidth: .infinity)
+            .buttonStyle(.plain)
+
+            Spacer()
+
+            VStack(spacing: 2) {
+                Text(sessionLabel.uppercased())
+                    .font(Theme.Fonts.mono(10))
+                    .tracking(1.0)
+                    .foregroundStyle(Color.white.opacity(0.55))
+                Text(elapsedText)
+                    .font(Theme.Fonts.display(28))
+                    .foregroundStyle(.white)
+                    .monospacedDigit()
+            }
+
+            Spacer()
+
+            Button { showingFinishConfirm = true } label: {
+                Text("Finish")
+                    .font(Theme.Fonts.ui(14, weight: .semibold))
+                    .foregroundStyle(Theme.Colors.limeInk)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(Theme.Colors.lime)
+                    .clipShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .disabled(!vm.isValid || vm.isSaving)
         }
+        .padding(.horizontal, Theme.Spacing.l)
+        .padding(.vertical, Theme.Spacing.s)
+    }
+
+    private var sessionLabel: String {
+        "\(vm.templateName ?? "Workout") · elapsed"
     }
 
     private var elapsedText: String {
@@ -110,136 +129,295 @@ struct ActiveWorkoutView: View {
             : String(format: "%02d:%02d", mm, ss)
     }
 
-    private var restSection: some View {
-        Section("Rest timer") {
-            HStack {
+    // MARK: - Rest pill
+
+    private var restPill: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 0) {
+                Text("REST TIMER")
+                    .font(Theme.Fonts.mono(10))
+                    .tracking(1.0)
+                    .foregroundStyle(Theme.Colors.lime.opacity(0.7))
                 Text(rest.displayText)
-                    .font(.title3.monospacedDigit().bold())
-                    .foregroundStyle(rest.isRunning ? Theme.Colors.kcal : .primary)
-                Spacer()
-                Button {
-                    rest.adjust(by: -15)
-                } label: {
-                    Image(systemName: "minus.circle")
-                }
-                .buttonStyle(.plain)
-                Button {
-                    rest.adjust(by: 15)
-                } label: {
-                    Image(systemName: "plus.circle")
-                }
-                .buttonStyle(.plain)
-                Button {
-                    if rest.isRunning { rest.stop() } else { rest.start() }
-                } label: {
-                    Text(rest.isRunning ? "Stop" : "Start")
-                        .fontWeight(.semibold)
-                        .frame(minWidth: 60)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(rest.isRunning ? .red : Theme.Colors.protein)
+                    .font(Theme.Fonts.display(44))
+                    .foregroundStyle(Theme.Colors.lime)
+                    .monospacedDigit()
             }
+            Spacer()
+            circleButton(text: "−15", action: { rest.adjust(by: -15) })
+            circleButton(text: "+15", action: { rest.adjust(by: 15) })
+            Button {
+                if rest.isRunning { rest.stop() } else { rest.start() }
+            } label: {
+                Image(systemName: rest.isRunning ? "pause.fill" : "play.fill")
+                    .foregroundStyle(Theme.Colors.limeInk)
+                    .frame(width: 42, height: 42)
+                    .background(Theme.Colors.lime)
+                    .clipShape(Circle())
+            }
+            .buttonStyle(.plain)
         }
+        .padding(14)
+        .background(Theme.Colors.lime.opacity(0.08))
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.Radius.l)
+                .stroke(Theme.Colors.lime.opacity(0.25), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.l))
     }
 
-    @ViewBuilder
-    private func exerciseSection(exercise: Binding<WorkoutExercise>) -> some View {
+    private func circleButton(text: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(text)
+                .font(Theme.Fonts.ui(12, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 44, height: 36)
+                .background(Color.white.opacity(0.08))
+                .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Exercise card
+
+    private func exerciseCard(exercise: Binding<WorkoutExercise>) -> some View {
         let units = profile?.unitsPref ?? .metric
-        Section {
+        return VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text(exercise.wrappedValue.exerciseName).font(.headline)
-                Spacer()
-                Button(role: .destructive) {
-                    if let idx = vm.exercises.firstIndex(where: { $0.id == exercise.wrappedValue.id }) {
-                        vm.removeExercise(at: IndexSet(integer: idx))
-                    }
-                } label: {
-                    Image(systemName: "trash").font(.caption)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(exercise.wrappedValue.exerciseName)
+                        .font(Theme.Fonts.display(20))
+                        .foregroundStyle(.white)
+                    PCEyebrow(
+                        text: "\(exercise.wrappedValue.kind.rawValue) · \(completedCount(exercise.wrappedValue))/\(exercise.wrappedValue.sets.count) sets",
+                        color: Color.white.opacity(0.55)
+                    )
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(.red.opacity(0.8))
+                Spacer()
+                Menu {
+                    Button(role: .destructive) {
+                        if let idx = vm.exercises.firstIndex(where: { $0.id == exercise.wrappedValue.id }) {
+                            vm.removeExercise(at: IndexSet(integer: idx))
+                        }
+                    } label: { Label("Remove", systemImage: "trash") }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .foregroundStyle(Color.white.opacity(0.7))
+                        .frame(width: 32, height: 32)
+                        .background(Color.white.opacity(0.06))
+                        .clipShape(Circle())
+                }
             }
 
-            ForEach(exercise.sets) { $set in
-                activeSetRow(
-                    set: $set,
-                    kind: exercise.wrappedValue.kind,
-                    units: units,
-                    exerciseId: exercise.wrappedValue.id
-                )
-            }
-            .onDelete { offsets in
-                vm.removeSet(fromExercise: exercise.wrappedValue.id, at: offsets)
+            columnHeaders(kind: exercise.wrappedValue.kind, units: units)
+
+            ForEach(Array(exercise.sets.enumerated()), id: \.element.id) { idx, $set in
+                setRow(set: $set,
+                       setIndex: idx + 1,
+                       kind: exercise.wrappedValue.kind,
+                       units: units,
+                       exerciseId: exercise.wrappedValue.id)
             }
 
             Button {
                 vm.addSet(toExercise: exercise.wrappedValue.id)
             } label: {
-                Label("Add set", systemImage: "plus")
-            }
-            .font(.footnote)
-        }
-    }
-
-    private func activeSetRow(
-        set: Binding<WorkoutSet>,
-        kind: ExerciseKind,
-        units: UnitsPreference,
-        exerciseId: String
-    ) -> some View {
-        HStack(spacing: 8) {
-            Text("\(set.wrappedValue.order + 1)")
-                .frame(width: 20, alignment: .leading)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-
-            switch kind {
-            case .strength:
-                doubleField("wt", weightBinding(set: set, units: units))
-                intField("reps", repsBinding(set: set))
-            case .bodyweight:
-                intField("reps", repsBinding(set: set))
-            case .cardio:
-                intField("min", minutesBinding(set: set))
-                doubleField(units == .metric ? "km" : "mi", distanceBinding(set: set, units: units))
-            }
-
-            Spacer()
-
-            Button {
-                vm.toggleSetCompleted(exerciseId: exerciseId, setId: set.wrappedValue.id)
-                if set.wrappedValue.completed && !rest.isRunning {
-                    // Just marked complete — leave timer start manual per design choice.
-                    // User taps Start on the rest section.
+                HStack {
+                    Image(systemName: "plus")
+                    Text("Add set")
+                        .font(Theme.Fonts.mono(10))
+                        .tracking(1.0)
                 }
-            } label: {
-                Image(systemName: set.wrappedValue.completed ? "checkmark.circle.fill" : "circle")
-                    .foregroundStyle(set.wrappedValue.completed ? Theme.Colors.protein : .secondary)
-                    .font(.title3)
+                .foregroundStyle(Color.white.opacity(0.6))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .strokeBorder(Color.white.opacity(0.15),
+                                      style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+                )
             }
             .buttonStyle(.plain)
         }
+        .padding(16)
+        .background(Color.white.opacity(0.04))
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.Radius.l)
+                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.l))
     }
 
-    private func doubleField(_ label: String, _ binding: Binding<Double>) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            TextField(label, value: binding, format: .number.precision(.fractionLength(0...2)))
-                .keyboardType(.decimalPad)
-                .textFieldStyle(.roundedBorder)
-                .frame(maxWidth: 66)
-            Text(label).font(.caption2).foregroundStyle(.secondary)
+    private func completedCount(_ ex: WorkoutExercise) -> Int {
+        ex.sets.filter { $0.completed }.count
+    }
+
+    private func columnHeaders(kind: ExerciseKind, units: UnitsPreference) -> some View {
+        HStack(spacing: 10) {
+            columnHeader("SET", width: 36, align: .leading)
+            columnHeader("PREV", width: 60, align: .leading)
+            switch kind {
+            case .strength:
+                columnHeader(units == .metric ? "KG" : "LB")
+                columnHeader("REPS")
+            case .bodyweight:
+                columnHeader("REPS")
+                Spacer().frame(maxWidth: .infinity)
+            case .cardio:
+                columnHeader("MIN")
+                columnHeader(units == .metric ? "KM" : "MI")
+            }
+            Spacer().frame(width: 40)
         }
     }
 
-    private func intField(_ label: String, _ binding: Binding<Int>) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            TextField(label, value: binding, format: .number)
-                .keyboardType(.numberPad)
-                .textFieldStyle(.roundedBorder)
-                .frame(maxWidth: 66)
-            Text(label).font(.caption2).foregroundStyle(.secondary)
+    private func columnHeader(_ text: String,
+                              width: CGFloat? = nil,
+                              align: HorizontalAlignment = .center) -> some View {
+        Text(text)
+            .font(Theme.Fonts.mono(9, weight: .semibold))
+            .tracking(0.9)
+            .foregroundStyle(Color.white.opacity(0.45))
+            .frame(width: width, alignment: Alignment(horizontal: align, vertical: .center))
+            .frame(maxWidth: width == nil ? .infinity : nil)
+    }
+
+    // MARK: - Set row
+
+    @ViewBuilder
+    private func setRow(set: Binding<WorkoutSet>,
+                        setIndex: Int,
+                        kind: ExerciseKind,
+                        units: UnitsPreference,
+                        exerciseId: String) -> some View {
+        let completed = set.wrappedValue.completed
+        HStack(spacing: 10) {
+            setIndexChip(setIndex, isPR: false, completed: completed)
+            Text(previousText(set.wrappedValue, kind: kind, units: units))
+                .font(Theme.Fonts.mono(11))
+                .foregroundStyle(Color.white.opacity(0.35))
+                .frame(width: 60, alignment: .leading)
+
+            switch kind {
+            case .strength:
+                darkDoubleField(weightBinding(set: set, units: units))
+                darkIntField(repsBinding(set: set))
+            case .bodyweight:
+                darkIntField(repsBinding(set: set))
+                Spacer().frame(maxWidth: .infinity)
+            case .cardio:
+                darkIntField(minutesBinding(set: set))
+                darkDoubleField(distanceBinding(set: set, units: units))
+            }
+
+            Button {
+                vm.toggleSetCompleted(exerciseId: exerciseId, setId: set.wrappedValue.id)
+                if set.wrappedValue.completed, !rest.isRunning {
+                    rest.start()
+                }
+            } label: {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(completed ? Theme.Colors.limeInk : Color.white.opacity(0.4))
+                    .frame(width: 40, height: 36)
+                    .background(completed ? Theme.Colors.lime : Color.white.opacity(0.06))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+            }
+            .buttonStyle(.plain)
+        }
+        .opacity(completed ? 0.55 : 1.0)
+    }
+
+    private func setIndexChip(_ idx: Int, isPR: Bool, completed: Bool) -> some View {
+        Text(isPR ? "PR" : "\(idx)")
+            .font(Theme.Fonts.display(13))
+            .foregroundStyle(isPR ? Theme.Colors.limeInk : .white)
+            .frame(width: 36, height: 28)
+            .background(isPR ? Theme.Colors.lime : Color.white.opacity(0.08))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    private func previousText(_ set: WorkoutSet,
+                              kind: ExerciseKind,
+                              units: UnitsPreference) -> String {
+        // Best-effort: without a lift history DB we can only show this session's prior set.
+        switch kind {
+        case .strength:
+            let kg = set.weightKg ?? 0
+            let reps = set.reps ?? 0
+            if kg == 0 && reps == 0 { return "—" }
+            let w = units == .metric ? kg : UnitConversion.lb(fromKg: kg)
+            return "\(Int(w))×\(reps)"
+        case .bodyweight:
+            return set.reps.map { "×\($0)" } ?? "—"
+        case .cardio:
+            return set.durationSeconds.map { "\($0 / 60)m" } ?? "—"
         }
     }
+
+    private func darkDoubleField(_ binding: Binding<Double>) -> some View {
+        TextField("", value: binding, format: .number.precision(.fractionLength(0...2)))
+            .keyboardType(.decimalPad)
+            .font(Theme.Fonts.display(22))
+            .foregroundStyle(.white)
+            .tint(Theme.Colors.lime)
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity)
+            .frame(height: 40)
+            .background(Color.white.opacity(0.04))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+
+    private func darkIntField(_ binding: Binding<Int>) -> some View {
+        TextField("", value: binding, format: .number)
+            .keyboardType(.numberPad)
+            .font(Theme.Fonts.display(22))
+            .foregroundStyle(.white)
+            .tint(Theme.Colors.lime)
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity)
+            .frame(height: 40)
+            .background(Color.white.opacity(0.04))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+
+    // MARK: - Add exercise + notes
+
+    private var addExerciseRow: some View {
+        Button { showingExercisePicker = true } label: {
+            HStack {
+                Image(systemName: "plus")
+                Text("Add exercise")
+                    .font(Theme.Fonts.mono(10))
+                    .tracking(1.0)
+            }
+            .foregroundStyle(Color.white.opacity(0.7))
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+            .overlay(
+                RoundedRectangle(cornerRadius: Theme.Radius.m)
+                    .strokeBorder(Color.white.opacity(0.18),
+                                  style: StrokeStyle(lineWidth: 1, dash: [5, 4]))
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var notesBlock: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            PCEyebrow(text: "Notes", color: Color.white.opacity(0.55))
+            TextField("Optional notes", text: $vm.notes, axis: .vertical)
+                .font(Theme.Fonts.ui(14))
+                .foregroundStyle(.white)
+                .tint(Theme.Colors.lime)
+                .lineLimit(1...4)
+                .padding(12)
+                .background(Color.white.opacity(0.04))
+                .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.m))
+        }
+    }
+
+    // MARK: - Bindings (reused from old file)
 
     private func weightBinding(set: Binding<WorkoutSet>, units: UnitsPreference) -> Binding<Double> {
         Binding(
