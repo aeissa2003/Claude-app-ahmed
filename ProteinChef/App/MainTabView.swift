@@ -9,7 +9,7 @@ struct MainTabView: View {
                 .tabItem { Label("Recipes", systemImage: "fork.knife") }
             WorkoutsListView()
                 .tabItem { Label("Workouts", systemImage: "dumbbell.fill") }
-            FeedPlaceholderView()
+            FeedView()
                 .tabItem { Label("Friends", systemImage: "person.2.fill") }
             SettingsPlaceholderView()
                 .tabItem { Label("Settings", systemImage: "gearshape.fill") }

@@ -51,16 +51,30 @@ service cloud.firestore {
       match /customIngredients/{id} { allow read, write: if isSelf(uid); }
       match /customExercises/{id}   { allow read, write: if isSelf(uid); }
 
-      // Friendships and requests — users write their own side; the "other" side is
-      // maintained via server-side Cloud Function in Phase 6.
+      // Friendships and requests — clients maintain both sides in atomic batches.
+      // Phase 8 may move sensitive mutations to Cloud Functions.
       match /friends/{friendUid} {
         allow read: if isSelf(uid);
         allow write: if isSelf(uid);
+        // Reciprocal create when the other party accepts my request: they write
+        // into my users/{uid}/friends/{me-as-friend} doc. Gated by the existence of
+        // their own incoming friend request from me — i.e. I did send one.
+        allow create: if isSignedIn()
+                      && request.auth.uid == friendUid
+                      && exists(/databases/$(database)/documents/users/$(request.auth.uid)/friendRequests/$(uid));
+        // Reciprocal delete during unfriend: the other party removes their side.
+        allow delete: if isSignedIn() && request.auth.uid == friendUid;
       }
       match /friendRequests/{fromUid} {
         allow read: if isSelf(uid);
         allow create: if isSignedIn() && request.auth.uid == fromUid;
         allow delete: if isSelf(uid) || (isSignedIn() && request.auth.uid == fromUid);
+      }
+      match /sentRequests/{toUid} {
+        allow read: if isSelf(uid);
+        allow create, update: if isSelf(uid);
+        allow delete: if isSelf(uid)
+                      || (isSignedIn() && request.auth.uid == toUid); // target consumes on accept
       }
     }
 

@@ -2,8 +2,10 @@ import SwiftUI
 
 struct RecipeDetailView: View {
     @Environment(AppEnvironment.self) private var env
+    @Environment(\.userProfile) private var profile
     let recipe: Recipe
     @State private var showingEditor = false
+    @State private var showingShareSheet = false
 
     var body: some View {
         ScrollView {
@@ -23,12 +25,26 @@ struct RecipeDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button("Edit") { showingEditor = true }
+                Menu {
+                    Button {
+                        showingEditor = true
+                    } label: { Label("Edit", systemImage: "pencil") }
+                    if profile?.id == recipe.ownerUid {
+                        Button {
+                            showingShareSheet = true
+                        } label: { Label("Share to feed", systemImage: "square.and.arrow.up") }
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                }
             }
         }
         .sheet(isPresented: $showingEditor) {
             RecipeEditorView(uid: recipe.ownerUid, editing: recipe)
                 .environment(env)
+        }
+        .sheet(isPresented: $showingShareSheet) {
+            ShareRecipeSheet(recipe: recipe).environment(env)
         }
     }
 

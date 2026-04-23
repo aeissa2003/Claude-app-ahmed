@@ -15,6 +15,8 @@ final class AppEnvironment {
     let workouts: WorkoutRepositoryProtocol
     let workoutTemplates: WorkoutTemplateRepositoryProtocol
     let customExercises: CustomExerciseRepositoryProtocol
+    let friends: FriendRepositoryProtocol
+    let feed: FeedRepositoryProtocol
 
     let ingredientCatalog: IngredientCatalogProtocol
     let exerciseCatalog: ExerciseCatalogProtocol
@@ -31,6 +33,8 @@ final class AppEnvironment {
         workouts: WorkoutRepositoryProtocol,
         workoutTemplates: WorkoutTemplateRepositoryProtocol,
         customExercises: CustomExerciseRepositoryProtocol,
+        friends: FriendRepositoryProtocol,
+        feed: FeedRepositoryProtocol,
         ingredientCatalog: IngredientCatalogProtocol,
         exerciseCatalog: ExerciseCatalogProtocol
     ) {
@@ -45,6 +49,8 @@ final class AppEnvironment {
         self.workouts = workouts
         self.workoutTemplates = workoutTemplates
         self.customExercises = customExercises
+        self.friends = friends
+        self.feed = feed
         self.ingredientCatalog = ingredientCatalog
         self.exerciseCatalog = exerciseCatalog
     }
@@ -62,6 +68,8 @@ final class AppEnvironment {
             workouts: FirebaseWorkoutRepository(),
             workoutTemplates: FirebaseWorkoutTemplateRepository(),
             customExercises: FirebaseCustomExerciseRepository(),
+            friends: FirebaseFriendRepository(),
+            feed: FirebaseFeedRepository(),
             ingredientCatalog: BundledIngredientCatalog(),
             exerciseCatalog: BundledExerciseCatalog()
         )
