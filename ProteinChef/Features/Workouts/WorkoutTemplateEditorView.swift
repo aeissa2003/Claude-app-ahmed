@@ -31,36 +31,34 @@ struct WorkoutTemplateEditorView: View {
                     TextField("Name", text: $name)
                 }
 
-                ForEach($exercises) { $exercise in
+                ForEach(Array(exercises.enumerated()), id: \.element.id) { idx, exercise in
                     Section {
                         HStack {
-                            Text(exercise.wrappedValue.exerciseName).font(.headline)
+                            Text(exercise.exerciseName).font(.headline)
                             Spacer()
                             Button(role: .destructive) {
-                                if let idx = exercises.firstIndex(where: { $0.id == exercise.wrappedValue.id }) {
-                                    exercises.remove(at: idx)
-                                }
+                                exercises.remove(at: idx)
                             } label: { Image(systemName: "trash").font(.caption) }
                                 .buttonStyle(.plain)
                                 .foregroundStyle(.red.opacity(0.8))
                         }
-                        Stepper(value: $exercise.targetSets, in: 1...10) {
-                            HStack { Text("Sets"); Spacer(); Text("\(exercise.wrappedValue.targetSets)") }
+                        Stepper(value: $exercises[idx].targetSets, in: 1...10) {
+                            HStack { Text("Sets"); Spacer(); Text("\(exercise.targetSets)") }
                         }
-                        switch exercise.wrappedValue.kind {
+                        switch exercise.kind {
                         case .strength, .bodyweight:
                             Stepper(value: Binding(
-                                get: { exercise.wrappedValue.targetReps ?? 10 },
-                                set: { exercise.wrappedValue.targetReps = $0 }
+                                get: { exercises[idx].targetReps ?? 10 },
+                                set: { exercises[idx].targetReps = $0 }
                             ), in: 1...50) {
-                                HStack { Text("Reps"); Spacer(); Text("\(exercise.wrappedValue.targetReps ?? 10)") }
+                                HStack { Text("Reps"); Spacer(); Text("\(exercise.targetReps ?? 10)") }
                             }
                         case .cardio:
                             Stepper(value: Binding(
-                                get: { (exercise.wrappedValue.targetDurationSeconds ?? 600) / 60 },
-                                set: { exercise.wrappedValue.targetDurationSeconds = $0 * 60 }
+                                get: { (exercises[idx].targetDurationSeconds ?? 600) / 60 },
+                                set: { exercises[idx].targetDurationSeconds = $0 * 60 }
                             ), in: 1...180, step: 1) {
-                                HStack { Text("Minutes"); Spacer(); Text("\((exercise.wrappedValue.targetDurationSeconds ?? 600) / 60)") }
+                                HStack { Text("Minutes"); Spacer(); Text("\((exercise.targetDurationSeconds ?? 600) / 60)") }
                             }
                         }
                     }
